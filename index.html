@@ -431,6 +431,7 @@
       for (const line of displayLines(post)) {
         createLine("body", line);
       }
+      createLine("blank");
       const endLine = createLine("meta", buildTransmissionEnd(new Date()));
       createLine("sep", SEPARATOR);
       attachCursor(endLine);
@@ -450,6 +451,7 @@
         await delay(rand(180, 420));
       }
 
+      await typeLine("blank", "");
       const endLine = await typeLine("meta", buildTransmissionEnd(new Date()));
       createLine("sep", SEPARATOR);
       attachCursor(endLine);
