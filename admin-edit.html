@@ -114,8 +114,6 @@
       overflow: hidden;
     }
 
-    .post-row.is-archived .post-row__label { color: var(--fg-muted); }
-
     .post-row:hover .post-row__label { color: var(--fg); }
 
     .manage-empty {
@@ -164,15 +162,13 @@
     </header>
 
     <p class="sys-line">[SYS] transmission registry open</p>
-    <p class="sys-line">[SYS] select entries to archive or delete</p>
+    <p class="sys-line">[SYS] select entries to delete</p>
 
     <div class="manage-title">Transmissions</div>
     <ul id="post-list"></ul>
     <p id="manage-empty" class="manage-empty" hidden>[SYS] no transmissions stored</p>
 
     <div class="actions">
-      <button type="button" id="archive-btn">COMMS&gt; archive selected_</button>
-      <button type="button" id="restore-btn">COMMS&gt; restore selected_</button>
       <button type="button" id="delete-btn">COMMS&gt; delete selected_</button>
     </div>
 
@@ -191,8 +187,6 @@
     const clockEl = document.getElementById("clock");
     const postListEl = document.getElementById("post-list");
     const manageEmptyEl = document.getElementById("manage-empty");
-    const archiveBtn = document.getElementById("archive-btn");
-    const restoreBtn = document.getElementById("restore-btn");
     const deleteBtn = document.getElementById("delete-btn");
     const errorEl = document.getElementById("status-error");
     const successEl = document.getElementById("status-success");
@@ -249,16 +243,13 @@
     }
 
     function setBusy(isBusy) {
-      archiveBtn.disabled = isBusy;
-      restoreBtn.disabled = isBusy;
       deleteBtn.disabled = isBusy;
     }
 
     function formatPostLabel(post) {
       const date = formatDoDate(new Date(post.sentAt)).replace(" d.O.", "");
       const text = post.lines.join(" ").trim().slice(0, SIDEBAR_MAX);
-      const prefix = post.archived ? "[ARCHIVED] " : "";
-      return `${prefix}${date} ${text}`;
+      return `${date} ${text}`;
     }
 
     function getSelectedPostIds() {
@@ -273,7 +264,7 @@
 
       let posts = [];
       try {
-        posts = await SpaceCommsStore.fetchAllPosts();
+        posts = await SpaceCommsStore.fetchAllPosts({ fresh: true });
       } catch {
         showError("[ERR] não foi possível carregar transmissões.");
         manageEmptyEl.hidden = true;
@@ -292,7 +283,7 @@
       for (const post of posts) {
         const li = document.createElement("li");
         const row = document.createElement("label");
-        row.className = "post-row" + (post.archived ? " is-archived" : "");
+        row.className = "post-row";
 
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
@@ -310,44 +301,6 @@
     }
 
     function bindEdit() {
-      archiveBtn.addEventListener("click", async () => {
-        const ids = getSelectedPostIds();
-        if (ids.length === 0) {
-          showError("[ERR] selecione ao menos uma transmissão.");
-          return;
-        }
-
-        setBusy(true);
-        try {
-          const result = await SpaceCommsStore.archivePosts(ids, true);
-          showSuccess(`[SYS] archived // ${result.updated} transmission(s)`);
-          await renderPostList();
-        } catch (err) {
-          showError(`[ERR] ${err.message}`);
-        } finally {
-          setBusy(false);
-        }
-      });
-
-      restoreBtn.addEventListener("click", async () => {
-        const ids = getSelectedPostIds();
-        if (ids.length === 0) {
-          showError("[ERR] selecione ao menos uma transmissão.");
-          return;
-        }
-
-        setBusy(true);
-        try {
-          const result = await SpaceCommsStore.archivePosts(ids, false);
-          showSuccess(`[SYS] restored // ${result.updated} transmission(s)`);
-          await renderPostList();
-        } catch (err) {
-          showError(`[ERR] ${err.message}`);
-        } finally {
-          setBusy(false);
-        }
-      });
-
       deleteBtn.addEventListener("click", async () => {
         const ids = getSelectedPostIds();
         if (ids.length === 0) {
@@ -358,7 +311,11 @@
         setBusy(true);
         try {
           const result = await SpaceCommsStore.deletePosts(ids);
-          showSuccess(`[SYS] deleted // ${result.removed} transmission(s)`);
+          if (!result.removed) {
+            showError("[ERR] nenhuma transmissão removida.");
+          } else {
+            showSuccess(`[SYS] deleted // ${result.removed} transmission(s)`);
+          }
           await renderPostList();
         } catch (err) {
           showError(`[ERR] ${err.message}`);

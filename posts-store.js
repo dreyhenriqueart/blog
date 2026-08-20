@@ -22,7 +22,17 @@
     return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${GH_PATH}?t=${Date.now()}`;
   }
 
-  async function fetchAllPosts() {
+  async function fetchAllPosts(options = {}) {
+    const fresh = Boolean(options.fresh);
+
+    // Admin: lê direto da API (sem cache do raw.githubusercontent)
+    if (fresh && !isLocalHost()) {
+      const token = await ensureToken();
+      const meta = await getFileMeta(token);
+      const data = decodeContent(meta);
+      return Array.isArray(data.posts) ? data.posts : [];
+    }
+
     const res = await fetch(postsUrl(), { cache: "no-store" });
     if (!res.ok) throw new Error("posts.json unavailable");
     const data = await res.json();
