@@ -417,6 +417,12 @@
       return lineEl;
     }
 
+    async function revealLine(type, text, pauseMs) {
+      const lineEl = createLine(type, text === undefined ? "" : text);
+      await delay(pauseMs ?? rand(90, 180));
+      return lineEl;
+    }
+
     function buildIncomingHeader(post) {
       const sentAt = post.sentAt instanceof Date ? post.sentAt : new Date(post.sentAt);
       const stamp = formatIncomingStamp(sentAt);
@@ -440,19 +446,19 @@
     async function transmitPost(post) {
       await delay(rand(400, 900));
 
-      await typeLine("meta", buildIncomingHeader(post));
-      await delay(rand(80, 160));
-      await typeLine("blank", "");
-      await typeLine("blank", "");
-      await delay(rand(80, 160));
+      // Header aparece linha por linha (sem cursor); só o corpo é digitado
+      await revealLine("meta", buildIncomingHeader(post));
+      await revealLine("blank", "");
+      await revealLine("blank", "");
+      await delay(rand(120, 240));
 
       for (const line of displayLines(post)) {
         await typeLine("body", line);
         await delay(rand(180, 420));
       }
 
-      await typeLine("blank", "");
-      const endLine = await typeLine("meta", buildTransmissionEnd(new Date()));
+      await revealLine("blank", "");
+      const endLine = await revealLine("meta", buildTransmissionEnd(new Date()));
       createLine("sep", SEPARATOR);
       attachCursor(endLine);
     }
