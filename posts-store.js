@@ -44,15 +44,25 @@
     else localStorage.removeItem(TOKEN_KEY);
   }
 
-  function ensureToken() {
+  async function ensureToken() {
     let token = getToken();
     if (token) return token;
-    token = window.prompt(
-      "Cole um GitHub Personal Access Token (classic) com permissão Contents: Write no repo blog.\n\n" +
-        "Crie em: GitHub → Settings → Developer settings → Personal access tokens"
-    );
-    if (!token || !token.trim()) throw new Error("token necessário para publicar");
-    setToken(token.trim());
+
+    if (isLocalHost()) {
+      throw new Error("use o servidor local (serve.bat) para gravar posts");
+    }
+
+    if (global.SpaceCommsAuth && typeof global.SpaceCommsAuth.askGitHubToken === "function") {
+      token = await global.SpaceCommsAuth.askGitHubToken();
+    } else {
+      throw new Error("uplink key necessária para publicar");
+    }
+
+    if (!token || !String(token).trim()) {
+      throw new Error("uplink key necessária para publicar");
+    }
+
+    setToken(String(token).trim());
     return getToken();
   }
 
@@ -116,7 +126,7 @@
   }
 
   async function mutateRemote(mutator, message) {
-    const token = ensureToken();
+    const token = await ensureToken();
     const meta = await getFileMeta(token);
     const data = decodeContent(meta);
     if (!Array.isArray(data.posts)) data.posts = [];

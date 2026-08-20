@@ -27,6 +27,8 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    html.is-locked .screen { display: none; }
+
     .screen { max-width: 640px; padding: 1rem 16px 2rem; }
 
     .status-bar {
@@ -108,6 +110,27 @@
     .status-msg.is-visible { display: block; }
     .error { color: var(--fg); }
     .success { color: var(--fg-dim); }
+
+    .auth-gate,
+    .token-gate {
+      max-width: 640px;
+      padding: 1rem 16px 2rem;
+    }
+
+    .token-gate {
+      position: fixed;
+      inset: 0;
+      background: rgba(240, 237, 230, 0.96);
+      z-index: 20;
+      display: flex;
+      align-items: flex-start;
+    }
+
+    .token-gate__panel {
+      max-width: 640px;
+      width: 100%;
+      padding: 1rem 16px 2rem;
+    }
   </style>
 </head>
 <body>
@@ -137,12 +160,13 @@
 
       <p id="error" class="status-msg error" role="alert"></p>
       <p id="success" class="status-msg success" role="status"></p>
-      <p class="hint">Preview simula em nova aba. Em produção, publish grava no GitHub (PAT com Contents: Write).</p>
+      <p class="hint">Senha do admin: puzzle. Em produção, a primeira publicação pede a uplink key (token GitHub) uma vez.</p>
     </form>
 
     <a class="nav-link" href="admin-edit.html">COMMS&gt; edit_</a>
   </main>
 
+  <script src="admin-auth.js"></script>
   <script src="posts-store.js"></script>
   <script>
     const PREVIEW_KEY = "spacecomms-preview";
@@ -177,7 +201,10 @@
     }
 
     function updateClock() {
-      clockEl.textContent = `${formatDoDate(new Date())} ${formatLocalTime(new Date())}`;
+      const stamp = `${formatDoDate(new Date())} ${formatLocalTime(new Date())}`;
+      if (clockEl) clockEl.textContent = stamp;
+      const gateClock = document.getElementById("clock-gate");
+      if (gateClock) gateClock.textContent = stamp;
     }
 
     function showError(message) {
@@ -220,47 +247,55 @@
       return { sentAt: new Date().toISOString(), origin, callsign, lines };
     }
 
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      clearStatus();
+    function bindCompose() {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        clearStatus();
 
-      const payload = readComposePayload();
-      if (!payload) return;
+        const payload = readComposePayload();
+        if (!payload) return;
 
-      const draft = { ...payload, id: `preview-${Date.now()}` };
+        const draft = { ...payload, id: `preview-${Date.now()}` };
 
-      setBusy(true);
-      try {
-        const existing = await SpaceCommsStore.fetchPublishedPosts();
-        localStorage.setItem(PREVIEW_KEY, JSON.stringify({ posts: [...existing, draft] }));
-        window.open("index.html?preview=1", "_blank");
-      } catch {
-        showError("[ERR] Falha ao preparar preview.");
-      } finally {
-        setBusy(false);
-      }
-    });
+        setBusy(true);
+        try {
+          const existing = await SpaceCommsStore.fetchPublishedPosts();
+          localStorage.setItem(PREVIEW_KEY, JSON.stringify({ posts: [...existing, draft] }));
+          window.open("index.html?preview=1", "_blank");
+        } catch {
+          showError("[ERR] Falha ao preparar preview.");
+        } finally {
+          setBusy(false);
+        }
+      });
 
-    publishBtn.addEventListener("click", async () => {
-      clearStatus();
+      publishBtn.addEventListener("click", async () => {
+        clearStatus();
 
-      const payload = readComposePayload();
-      if (!payload) return;
+        const payload = readComposePayload();
+        if (!payload) return;
 
-      setBusy(true);
-      try {
-        const created = await SpaceCommsStore.publishPost(payload);
-        showSuccess(`[SYS] published // id ${created.id} // uplink stored`);
-        document.getElementById("message").value = "";
-      } catch (err) {
-        showError(`[ERR] ${err.message}`);
-      } finally {
-        setBusy(false);
-      }
-    });
+        setBusy(true);
+        try {
+          const created = await SpaceCommsStore.publishPost(payload);
+          showSuccess(`[SYS] published // id ${created.id} // uplink stored`);
+          document.getElementById("message").value = "";
+        } catch (err) {
+          showError(`[ERR] ${err.message}`);
+        } finally {
+          setBusy(false);
+        }
+      });
+    }
 
     updateClock();
     setInterval(updateClock, 1000);
+
+    SpaceCommsAuth.mountGate({
+      onReady() {
+        bindCompose();
+      }
+    });
   </script>
 </body>
 </html>

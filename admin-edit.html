@@ -27,6 +27,8 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    html.is-locked .screen { display: none; }
+
     .screen { max-width: 720px; padding: 1rem 16px 2rem; }
 
     .status-bar {
@@ -40,6 +42,31 @@
     .status-bar span { color: var(--fg-dim); }
 
     .sys-line { color: var(--fg-dim); margin-bottom: 0.5rem; }
+
+    label {
+      display: block;
+      color: var(--fg-muted);
+      font-size: 13px;
+      margin-bottom: 0.35rem;
+    }
+
+    input {
+      display: block;
+      width: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      border: none;
+      border-bottom: 1px solid var(--fg-muted);
+      font: inherit;
+      line-height: 1.55;
+      padding: 0.25rem 0;
+      margin-bottom: 1.25rem;
+      outline: none;
+    }
+
+    input:focus { border-bottom-color: var(--fg); }
+
+    .form-block { margin-top: 1.5rem; }
 
     .nav-link {
       display: inline-block;
@@ -121,6 +148,27 @@
     .status-msg.is-visible { display: block; }
     .error { color: var(--fg); }
     .success { color: var(--fg-dim); }
+
+    .auth-gate,
+    .token-gate {
+      max-width: 720px;
+      padding: 1rem 16px 2rem;
+    }
+
+    .token-gate {
+      position: fixed;
+      inset: 0;
+      background: rgba(240, 237, 230, 0.96);
+      z-index: 20;
+      display: flex;
+      align-items: flex-start;
+    }
+
+    .token-gate__panel {
+      max-width: 720px;
+      width: 100%;
+      padding: 1rem 16px 2rem;
+    }
   </style>
 </head>
 <body>
@@ -150,6 +198,7 @@
     <a class="nav-link" href="admin.html">COMMS&gt; compose_</a>
   </main>
 
+  <script src="admin-auth.js"></script>
   <script src="posts-store.js"></script>
   <script>
     const DO_EPOCH = 1000;
@@ -192,7 +241,10 @@
     }
 
     function updateClock() {
-      clockEl.textContent = `${formatDoDate(new Date())} ${formatLocalTime(new Date())}`;
+      const stamp = `${formatDoDate(new Date())} ${formatLocalTime(new Date())}`;
+      if (clockEl) clockEl.textContent = stamp;
+      const gateClock = document.getElementById("clock-gate");
+      if (gateClock) gateClock.textContent = stamp;
     }
 
     function showError(message) {
@@ -273,66 +325,75 @@
       }
     }
 
-    archiveBtn.addEventListener("click", async () => {
-      const ids = getSelectedPostIds();
-      if (ids.length === 0) {
-        showError("[ERR] selecione ao menos uma transmissão.");
-        return;
-      }
+    function bindEdit() {
+      archiveBtn.addEventListener("click", async () => {
+        const ids = getSelectedPostIds();
+        if (ids.length === 0) {
+          showError("[ERR] selecione ao menos uma transmissão.");
+          return;
+        }
 
-      setBusy(true);
-      try {
-        const result = await SpaceCommsStore.archivePosts(ids, true);
-        showSuccess(`[SYS] archived // ${result.updated} transmission(s)`);
-        await renderPostList();
-      } catch (err) {
-        showError(`[ERR] ${err.message}`);
-      } finally {
-        setBusy(false);
-      }
-    });
+        setBusy(true);
+        try {
+          const result = await SpaceCommsStore.archivePosts(ids, true);
+          showSuccess(`[SYS] archived // ${result.updated} transmission(s)`);
+          await renderPostList();
+        } catch (err) {
+          showError(`[ERR] ${err.message}`);
+        } finally {
+          setBusy(false);
+        }
+      });
 
-    restoreBtn.addEventListener("click", async () => {
-      const ids = getSelectedPostIds();
-      if (ids.length === 0) {
-        showError("[ERR] selecione ao menos uma transmissão.");
-        return;
-      }
+      restoreBtn.addEventListener("click", async () => {
+        const ids = getSelectedPostIds();
+        if (ids.length === 0) {
+          showError("[ERR] selecione ao menos uma transmissão.");
+          return;
+        }
 
-      setBusy(true);
-      try {
-        const result = await SpaceCommsStore.archivePosts(ids, false);
-        showSuccess(`[SYS] restored // ${result.updated} transmission(s)`);
-        await renderPostList();
-      } catch (err) {
-        showError(`[ERR] ${err.message}`);
-      } finally {
-        setBusy(false);
-      }
-    });
+        setBusy(true);
+        try {
+          const result = await SpaceCommsStore.archivePosts(ids, false);
+          showSuccess(`[SYS] restored // ${result.updated} transmission(s)`);
+          await renderPostList();
+        } catch (err) {
+          showError(`[ERR] ${err.message}`);
+        } finally {
+          setBusy(false);
+        }
+      });
 
-    deleteBtn.addEventListener("click", async () => {
-      const ids = getSelectedPostIds();
-      if (ids.length === 0) {
-        showError("[ERR] selecione ao menos uma transmissão.");
-        return;
-      }
+      deleteBtn.addEventListener("click", async () => {
+        const ids = getSelectedPostIds();
+        if (ids.length === 0) {
+          showError("[ERR] selecione ao menos uma transmissão.");
+          return;
+        }
 
-      setBusy(true);
-      try {
-        const result = await SpaceCommsStore.deletePosts(ids);
-        showSuccess(`[SYS] deleted // ${result.removed} transmission(s)`);
-        await renderPostList();
-      } catch (err) {
-        showError(`[ERR] ${err.message}`);
-      } finally {
-        setBusy(false);
-      }
-    });
+        setBusy(true);
+        try {
+          const result = await SpaceCommsStore.deletePosts(ids);
+          showSuccess(`[SYS] deleted // ${result.removed} transmission(s)`);
+          await renderPostList();
+        } catch (err) {
+          showError(`[ERR] ${err.message}`);
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      renderPostList();
+    }
 
     updateClock();
     setInterval(updateClock, 1000);
-    renderPostList();
+
+    SpaceCommsAuth.mountGate({
+      onReady() {
+        bindEdit();
+      }
+    });
   </script>
 </body>
 </html>
