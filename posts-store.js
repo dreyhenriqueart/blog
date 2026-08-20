@@ -73,14 +73,21 @@
     return String(max + 1).padStart(3, "0");
   }
 
+  async function ghFetch(url, options = {}) {
+    try {
+      return await fetch(url, options);
+    } catch {
+      throw new Error("falha de rede ao falar com o GitHub (CORS/rede). Tente de novo.");
+    }
+  }
+
   async function getFileMeta(token) {
-    const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}&t=${Date.now()}`;
-    const res = await fetch(url, {
+    const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}&_=${Date.now()}`;
+    const res = await ghFetch(url, {
       cache: "no-store",
       headers: {
         Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "Cache-Control": "no-cache"
+        Authorization: `Bearer ${token}`
       }
     });
     if (!res.ok) {
@@ -108,7 +115,7 @@
 
   async function putPosts(token, data, sha, message) {
     const content = encodeContent(data);
-    const res = await fetch(
+    const res = await ghFetch(
       `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}`,
       {
         method: "PUT",
