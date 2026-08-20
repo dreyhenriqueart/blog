@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>COMMS // VEGA-1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f0ede6;
+      --fg: #1a1916;
+      --fg-dim: #5c5952;
+      --fg-muted: #8a877f;
+      --cursor: #1a1916;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "IBM Plex Mono", "Consolas", "Courier New", monospace;
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      min-height: 100vh;
+    }
+
+    .layout {
+      display: flex;
+      min-height: 100vh;
+      width: 100%;
+      margin: 0;
+      padding: 1rem 16px 2rem;
+      gap: 1.25rem;
+    }
+
+    .main-column {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .status-bar {
+      color: var(--fg-muted);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      margin-bottom: 1.25rem;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .status-bar span {
+      color: var(--fg-dim);
+    }
+
+    #feed {
+      flex: 1;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .sidebar {
+      min-width: max-content;
+      flex-shrink: 0;
+    }
+
+    .sidebar-title {
+      color: var(--fg-muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.75rem;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    #archive {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .archive-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+      color: var(--fg-dim);
+      line-height: 1.55;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .archive-item:hover {
+      color: var(--fg);
+    }
+
+    .archive-item.is-active {
+      color: var(--fg);
+    }
+
+    .line {
+      min-height: 1.55em;
+    }
+
+    .line--sys {
+      color: var(--fg-dim);
+    }
+
+    .line--meta {
+      color: var(--fg);
+    }
+
+    .line--body {
+      color: var(--fg);
+    }
+
+    .line--sep {
+      color: var(--fg);
+      margin-top: 1rem;
+    }
+
+    .line--blank {
+      min-height: 1.55em;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 0.58em;
+      height: 1.05em;
+      background: var(--cursor);
+      vertical-align: text-bottom;
+      margin-left: 1px;
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    @media (max-width: 720px) {
+      .layout {
+        flex-direction: column;
+        padding: 1rem 10px 1.5rem;
+      }
+
+      .sidebar {
+        width: 100%;
+        min-width: 0;
+        padding-top: 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <main class="main-column">
+      <header class="status-bar">
+        COMMS TERMINAL v4.2.1 &nbsp;|&nbsp;
+        <span id="clock">--</span> &nbsp;|&nbsp;
+        LISTENER: <span id="listener">INIT</span>
+      </header>
+
+      <div id="feed" aria-live="polite" aria-label="Transmissão ativa"></div>
+    </main>
+
+    <aside class="sidebar">
+      <div class="sidebar-title">Transmissions</div>
+      <ul id="archive"></ul>
+    </aside>
+  </div>
+
+  <script src="posts-store.js"></script>
+  <script>
+    const PREVIEW_KEY = "spacecomms-preview";
+    const DO_EPOCH = 1000; // Mil d.O. — ano real menos 1000 (ex.: 2026 → 1026 d.O.)
+    const SEPARATOR = "────────────────────────────────────────";
+    const SIDEBAR_MAX = 21;
+    const POLL_MS = 2000;
+    const isPreview = new URLSearchParams(location.search).get("preview") === "1";
+
+    const BOOT = [
+      { type: "sys", text: "[SYS] initializing deep space comms terminal..." },
+      { type: "sys", text: "[SYS] decrypt channel // key exchange OK" },
+      { type: "sys", text: "[SYS] uplink established // latency: 14m 22s" },
+      { type: "sys", text: "[SYS] listener ACTIVE — awaiting latest transmission" },
+      { type: "sep", text: SEPARATOR }
+    ];
+
+    const feed = document.getElementById("feed");
+    const archiveEl = document.getElementById("archive");
+    const listenerEl = document.getElementById("listener");
+    const clockEl = document.getElementById("clock");
+
+    let posts = [];
+    let activePostId = null;
+    let activeLine = null;
+    let activeCursor = null;
+    let typing = false;
+    let bootComplete = false;
+    let knownPostIds = new Set();
+    const queue = [];
+
+    function parsePost(raw) {
+      return {
+        id: raw.id,
+        sentAt: new Date(raw.sentAt),
+        origin: raw.origin,
+        callsign: raw.callsign,
+        lines: Array.isArray(raw.lines) ? raw.lines : [String(raw.lines || "")]
+      };
+    }
+
+    async function loadPosts() {
+      if (isPreview) {
+        const raw = localStorage.getItem(PREVIEW_KEY);
+        if (!raw) throw new Error("preview missing");
+        const data = JSON.parse(raw);
+        return (data.posts || [])
+          .filter((raw) => !raw.archived)
+          .map(parsePost)
+          .sort((a, b) => a.sentAt - b.sentAt);
+      }
+
+      const published = await SpaceCommsStore.fetchPublishedPosts();
+      return published.map(parsePost);
+    }
+
+    async function pollForNewPosts() {
+      if (isPreview || !bootComplete) return;
+
+      try {
+        const fresh = (await SpaceCommsStore.fetchPublishedPosts()).map(parsePost);
+        const freshIds = new Set(fresh.map((post) => post.id));
+        const newcomers = fresh.filter((post) => !knownPostIds.has(post.id));
+        const removedAny = posts.some((post) => !freshIds.has(post.id));
+        const activeRemoved = activePostId && !freshIds.has(activePostId);
+
+        if (newcomers.length === 0 && !removedAny) return;
+
+        posts = fresh;
+        knownPostIds = freshIds;
+
+        renderSidebar();
+
+        if (activeRemoved) {
+          const latest = getLatestPost();
+          if (latest) {
+            activePostId = latest.id;
+            updateSidebarActive();
+            if (!typing) renderPostInstant(latest);
+          } else {
+            activePostId = null;
+            if (!typing) clearFeed();
+          }
+        }
+
+        for (const post of newcomers) {
+          enqueuePost(post);
+        }
+      } catch {
+        // uplink retry on next poll
+      }
+    }
+
+    function startLiveListener() {
+      if (isPreview) return;
+      setInterval(pollForNewPosts, POLL_MS);
+    }
+
+    function doYear(date) {
+      return date.getFullYear() - DO_EPOCH;
+    }
+
+    function formatDoDate(date) {
+      const formatter = new Intl.DateTimeFormat(undefined, {
+        day: "numeric",
+        month: "numeric",
+        year: "numeric"
+      });
+      const parts = formatter.formatToParts(date);
+      let output = "";
+      for (const part of parts) {
+        if (part.type === "year") {
+          output += `${doYear(date)} d.O.`;
+        } else {
+          output += part.value;
+        }
+      }
+      return output.replace(/\//g, ".").replace(/-/g, ".");
+    }
+
+    function formatLocalTime(date) {
+      return new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit"
+      }).format(date);
+    }
+
+    function formatIncomingStamp(date) {
+      return `${formatDoDate(date)} ${formatLocalTime(date)}`;
+    }
+
+    function formatHeaderClock(date) {
+      return `${formatDoDate(date)} ${formatLocalTime(date)}`;
+    }
+
+    function formatSidebarLabel(post) {
+      const date = formatDoDate(post.sentAt).replace(" d.O.", "");
+      const text = post.lines.join(" ").trim().slice(0, SIDEBAR_MAX);
+      return `${date} ${text}`;
+    }
+
+    function getLatestPost() {
+      return posts[posts.length - 1];
+    }
+
+    function rand(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function delay(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function updateClock() {
+      clockEl.textContent = formatHeaderClock(new Date());
+    }
+
+    function clearFeed() {
+      feed.innerHTML = "";
+      activeLine = null;
+      if (activeCursor) {
+        activeCursor = null;
+      }
+    }
+
+    function createLine(type, text) {
+      const el = document.createElement("div");
+      el.className = `line line--${type}`;
+      if (text !== undefined) el.textContent = text;
+      feed.appendChild(el);
+      return el;
+    }
+
+    function attachCursor(lineEl) {
+      if (activeCursor && activeCursor.parentNode) {
+        activeCursor.remove();
+      }
+      activeLine = lineEl;
+      activeCursor = document.createElement("span");
+      activeCursor.className = "cursor";
+      activeCursor.setAttribute("aria-hidden", "true");
+      lineEl.appendChild(activeCursor);
+    }
+
+    function removeCursor() {
+      if (activeCursor && activeCursor.parentNode) {
+        activeCursor.remove();
+      }
+      activeCursor = null;
+    }
+
+    async function typeText(lineEl, text, speedMin = 22, speedMax = 48) {
+      attachCursor(lineEl);
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        lineEl.insertBefore(document.createTextNode(ch), activeCursor);
+        let pause = rand(speedMin, speedMax);
+        if (ch === "." || ch === ",") pause += rand(80, 180);
+        if (ch === "\n") pause += rand(120, 280);
+        await delay(pause);
+      }
+    }
+
+    async function typeLine(type, text) {
+      const lineEl = createLine(type);
+      await typeText(lineEl, text);
+      return lineEl;
+    }
+
+    function buildIncomingHeader(post) {
+      const sentAt = post.sentAt instanceof Date ? post.sentAt : new Date(post.sentAt);
+      const stamp = formatIncomingStamp(sentAt);
+      return `[${stamp}] << INCOMING // ORIGIN: ${post.origin} / CALLSIGN ${post.callsign}`;
+    }
+
+    function renderPostInstant(post) {
+      clearFeed();
+      createLine("meta", buildIncomingHeader(post));
+      createLine("blank");
+      createLine("blank");
+      let lastBodyLine = null;
+      for (const line of post.lines) {
+        lastBodyLine = createLine("body", line);
+      }
+      createLine("sep", SEPARATOR);
+      if (lastBodyLine) attachCursor(lastBodyLine);
+    }
+
+    async function transmitPost(post) {
+      await delay(rand(400, 900));
+
+      await typeLine("meta", buildIncomingHeader(post));
+      await delay(rand(80, 160));
+      await typeLine("blank", "");
+      await typeLine("blank", "");
+      await delay(rand(80, 160));
+
+      let lastBodyLine = null;
+      for (const line of post.lines) {
+        lastBodyLine = await typeLine("body", line);
+        await delay(rand(180, 420));
+      }
+
+      createLine("sep", SEPARATOR);
+      if (lastBodyLine) attachCursor(lastBodyLine);
+    }
+
+    function renderSidebar() {
+      archiveEl.innerHTML = "";
+      const sorted = [...posts].sort((a, b) => b.sentAt - a.sentAt);
+
+      for (const post of sorted) {
+        const li = document.createElement("li");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "archive-item";
+        btn.dataset.postId = post.id;
+        btn.textContent = formatSidebarLabel(post);
+        btn.addEventListener("click", () => selectPost(post.id, { animate: false }));
+        li.appendChild(btn);
+        archiveEl.appendChild(li);
+      }
+
+      updateSidebarActive();
+    }
+
+    function updateSidebarActive() {
+      archiveEl.querySelectorAll(".archive-item").forEach((btn) => {
+        btn.classList.toggle("is-active", btn.dataset.postId === activePostId);
+      });
+    }
+
+    async function selectPost(postId, { animate = false, skipBoot = true } = {}) {
+      const post = posts.find((p) => p.id === postId);
+      if (!post || (typing && postId !== activePostId)) return;
+
+      activePostId = postId;
+      updateSidebarActive();
+
+      if (animate) {
+        if (!skipBoot) {
+          clearFeed();
+          await runBoot();
+        } else {
+          clearFeed();
+        }
+        await transmitPost(post);
+      } else {
+        renderPostInstant(post);
+      }
+    }
+
+    async function runBoot() {
+      listenerEl.textContent = "SYNC";
+      for (const item of BOOT) {
+        await typeLine(item.type, item.text);
+        await delay(rand(120, 320));
+      }
+      listenerEl.textContent = "ACTIVE";
+      bootComplete = true;
+    }
+
+    async function processQueue() {
+      if (typing) return;
+      typing = true;
+      listenerEl.textContent = "RX";
+
+      while (queue.length > 0) {
+        const post = queue.shift();
+        activePostId = post.id;
+        updateSidebarActive();
+        clearFeed();
+        await transmitPost(post);
+      }
+
+      typing = false;
+      listenerEl.textContent = "ACTIVE";
+    }
+
+    function enqueuePost(post) {
+      queue.push(post);
+      processQueue();
+    }
+
+    function normalizePost(post) {
+      const lines = Array.isArray(post.lines)
+        ? post.lines
+        : [String(post.body || post.text || "")];
+
+      return {
+        id: post.id || String(Date.now()),
+        sentAt: post.sentAt ? new Date(post.sentAt) : new Date(),
+        origin: post.origin || "UNKNOWN",
+        callsign: post.callsign || "UNKNOWN",
+        lines
+      };
+    }
+
+    async function boot() {
+      updateClock();
+      setInterval(updateClock, 1000);
+
+      posts = await loadPosts();
+      if (posts.length === 0) return;
+
+      knownPostIds = new Set(posts.map((post) => post.id));
+
+      const latest = getLatestPost();
+      activePostId = latest.id;
+      renderSidebar();
+
+      clearFeed();
+      await runBoot();
+      await transmitPost(latest);
+      startLiveListener();
+    }
+
+    boot().catch(() => {
+      listenerEl.textContent = "ERR";
+      const msg = isPreview
+        ? "[SYS] preview unavailable — compose again in admin"
+        : "[SYS] failed to load transmissions";
+      createLine("sys", msg);
+    });
+  </script>
+</body>
+</html>

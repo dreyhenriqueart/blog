@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>COMMS // ADMIN</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f0ede6;
+      --fg: #1a1916;
+      --fg-dim: #5c5952;
+      --fg-muted: #8a877f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "IBM Plex Mono", "Consolas", "Courier New", monospace;
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .screen { max-width: 640px; padding: 1rem 16px 2rem; }
+
+    .status-bar {
+      color: var(--fg-muted);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      margin-bottom: 1.5rem;
+      user-select: none;
+    }
+
+    .status-bar span { color: var(--fg-dim); }
+
+    .sys-line { color: var(--fg-dim); margin-bottom: 0.5rem; }
+
+    label {
+      display: block;
+      color: var(--fg-muted);
+      font-size: 13px;
+      margin-bottom: 0.35rem;
+    }
+
+    input, textarea {
+      display: block;
+      width: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      border: none;
+      border-bottom: 1px solid var(--fg-muted);
+      font: inherit;
+      line-height: 1.55;
+      padding: 0.25rem 0;
+      margin-bottom: 1.25rem;
+      outline: none;
+    }
+
+    input:focus, textarea:focus { border-bottom-color: var(--fg); }
+
+    textarea {
+      min-height: 160px;
+      resize: vertical;
+      white-space: pre-wrap;
+    }
+
+    .form-block { margin-top: 1.5rem; }
+
+    .actions {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .nav-link {
+      display: inline-block;
+      margin-top: 1.5rem;
+      color: var(--fg-dim);
+      text-decoration: none;
+      font: inherit;
+    }
+
+    .nav-link:hover { color: var(--fg); }
+
+    button {
+      background: none;
+      border: none;
+      font: inherit;
+      color: var(--fg);
+      cursor: pointer;
+      padding: 0;
+      text-align: left;
+    }
+
+    button:hover { color: var(--fg-dim); }
+    button:disabled { color: var(--fg-muted); cursor: wait; }
+
+    .hint { color: var(--fg-muted); font-size: 12px; margin-top: 1rem; }
+
+    .status-msg { margin-top: 0.75rem; display: none; }
+    .status-msg.is-visible { display: block; }
+    .error { color: var(--fg); }
+    .success { color: var(--fg-dim); }
+  </style>
+</head>
+<body>
+  <main class="screen">
+    <header class="status-bar">
+      COMMS ADMIN v0.1 &nbsp;|&nbsp;
+      <span id="clock">--</span> &nbsp;|&nbsp;
+      MODE: <span>COMPOSE</span>
+    </header>
+
+    <p class="sys-line">[SYS] uplink compose channel open</p>
+
+    <form id="compose-form" class="form-block">
+      <label for="origin">ORIGIN</label>
+      <input id="origin" name="origin" type="text" value="ASTR-7" autocomplete="off" required />
+
+      <label for="callsign">CALLSIGN</label>
+      <input id="callsign" name="callsign" type="text" value="VEGA-1" autocomplete="off" required />
+
+      <label for="message">TRANSMISSION BODY</label>
+      <textarea id="message" name="message" placeholder="Uma linha por parágrafo." required></textarea>
+
+      <div class="actions">
+        <button type="submit" id="preview-btn">COMMS&gt; preview_</button>
+        <button type="button" id="publish-btn">COMMS&gt; publish_</button>
+      </div>
+
+      <p id="error" class="status-msg error" role="alert"></p>
+      <p id="success" class="status-msg success" role="status"></p>
+      <p class="hint">Preview simula em nova aba. Em produção, publish grava no GitHub (PAT com Contents: Write).</p>
+    </form>
+
+    <a class="nav-link" href="admin-edit.html">COMMS&gt; edit_</a>
+  </main>
+
+  <script src="posts-store.js"></script>
+  <script>
+    const PREVIEW_KEY = "spacecomms-preview";
+    const DO_EPOCH = 1000;
+
+    const clockEl = document.getElementById("clock");
+    const form = document.getElementById("compose-form");
+    const errorEl = document.getElementById("error");
+    const successEl = document.getElementById("success");
+    const previewBtn = document.getElementById("preview-btn");
+    const publishBtn = document.getElementById("publish-btn");
+
+    function doYear(date) { return date.getFullYear() - DO_EPOCH; }
+
+    function formatDoDate(date) {
+      const formatter = new Intl.DateTimeFormat(undefined, {
+        day: "numeric", month: "numeric", year: "numeric"
+      });
+      const parts = formatter.formatToParts(date);
+      let output = "";
+      for (const part of parts) {
+        if (part.type === "year") output += `${doYear(date)} d.O.`;
+        else output += part.value;
+      }
+      return output.replace(/\//g, ".").replace(/-/g, ".");
+    }
+
+    function formatLocalTime(date) {
+      return new Intl.DateTimeFormat(undefined, {
+        hour: "numeric", minute: "2-digit", second: "2-digit"
+      }).format(date);
+    }
+
+    function updateClock() {
+      clockEl.textContent = `${formatDoDate(new Date())} ${formatLocalTime(new Date())}`;
+    }
+
+    function showError(message) {
+      successEl.classList.remove("is-visible");
+      errorEl.textContent = message;
+      errorEl.classList.add("is-visible");
+    }
+
+    function showSuccess(message) {
+      errorEl.classList.remove("is-visible");
+      successEl.textContent = message;
+      successEl.classList.add("is-visible");
+    }
+
+    function clearStatus() {
+      errorEl.classList.remove("is-visible");
+      successEl.classList.remove("is-visible");
+    }
+
+    function setBusy(isBusy) {
+      previewBtn.disabled = isBusy;
+      publishBtn.disabled = isBusy;
+    }
+
+    function parseLines(text) {
+      return text.split("\n").map((line) => line.trim()).filter(Boolean);
+    }
+
+    function readComposePayload() {
+      const origin = document.getElementById("origin").value.trim();
+      const callsign = document.getElementById("callsign").value.trim();
+      const message = document.getElementById("message").value.trim();
+      const lines = parseLines(message);
+
+      if (!origin || !callsign || lines.length === 0) {
+        showError("[ERR] ORIGIN, CALLSIGN e corpo da transmissão são obrigatórios.");
+        return null;
+      }
+
+      return { sentAt: new Date().toISOString(), origin, callsign, lines };
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      clearStatus();
+
+      const payload = readComposePayload();
+      if (!payload) return;
+
+      const draft = { ...payload, id: `preview-${Date.now()}` };
+
+      setBusy(true);
+      try {
+        const existing = await SpaceCommsStore.fetchPublishedPosts();
+        localStorage.setItem(PREVIEW_KEY, JSON.stringify({ posts: [...existing, draft] }));
+        window.open("index.html?preview=1", "_blank");
+      } catch {
+        showError("[ERR] Falha ao preparar preview.");
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    publishBtn.addEventListener("click", async () => {
+      clearStatus();
+
+      const payload = readComposePayload();
+      if (!payload) return;
+
+      setBusy(true);
+      try {
+        const created = await SpaceCommsStore.publishPost(payload);
+        showSuccess(`[SYS] published // id ${created.id} // uplink stored`);
+        document.getElementById("message").value = "";
+      } catch (err) {
+        showError(`[ERR] ${err.message}`);
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    updateClock();
+    setInterval(updateClock, 1000);
+  </script>
+</body>
+</html>

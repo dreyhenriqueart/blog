@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>COMMS // ADMIN EDIT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f0ede6;
+      --fg: #1a1916;
+      --fg-dim: #5c5952;
+      --fg-muted: #8a877f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "IBM Plex Mono", "Consolas", "Courier New", monospace;
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .screen { max-width: 720px; padding: 1rem 16px 2rem; }
+
+    .status-bar {
+      color: var(--fg-muted);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      margin-bottom: 1.5rem;
+      user-select: none;
+    }
+
+    .status-bar span { color: var(--fg-dim); }
+
+    .sys-line { color: var(--fg-dim); margin-bottom: 0.5rem; }
+
+    .nav-link {
+      display: inline-block;
+      margin-top: 1rem;
+      color: var(--fg-dim);
+      text-decoration: none;
+      font: inherit;
+    }
+
+    .nav-link:hover { color: var(--fg); }
+
+    .manage-title {
+      color: var(--fg-muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    #post-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 1rem;
+    }
+
+    .post-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      line-height: 1.55;
+      cursor: pointer;
+    }
+
+    .post-row input {
+      width: auto;
+      margin: 0.2rem 0 0;
+      accent-color: var(--fg);
+    }
+
+    .post-row__label {
+      color: var(--fg-dim);
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .post-row.is-archived .post-row__label { color: var(--fg-muted); }
+
+    .post-row:hover .post-row__label { color: var(--fg); }
+
+    .manage-empty {
+      color: var(--fg-muted);
+      font-size: 13px;
+      margin-bottom: 1rem;
+    }
+
+    .actions {
+      margin-top: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    button {
+      background: none;
+      border: none;
+      font: inherit;
+      color: var(--fg);
+      cursor: pointer;
+      padding: 0;
+      text-align: left;
+    }
+
+    button:hover { color: var(--fg-dim); }
+    button:disabled { color: var(--fg-muted); cursor: wait; }
+
+    .status-msg { margin-top: 0.75rem; display: none; }
+    .status-msg.is-visible { display: block; }
+    .error { color: var(--fg); }
+    .success { color: var(--fg-dim); }
+  </style>
+</head>
+<body>
+  <main class="screen">
+    <header class="status-bar">
+      COMMS ADMIN v0.1 &nbsp;|&nbsp;
+      <span id="clock">--</span> &nbsp;|&nbsp;
+      MODE: <span>EDIT</span>
+    </header>
+
+    <p class="sys-line">[SYS] transmission registry open</p>
+    <p class="sys-line">[SYS] select entries to archive or delete</p>
+
+    <div class="manage-title">Transmissions</div>
+    <ul id="post-list"></ul>
+    <p id="manage-empty" class="manage-empty" hidden>[SYS] no transmissions stored</p>
+
+    <div class="actions">
+      <button type="button" id="archive-btn">COMMS&gt; archive selected_</button>
+      <button type="button" id="restore-btn">COMMS&gt; restore selected_</button>
+      <button type="button" id="delete-btn">COMMS&gt; delete selected_</button>
+    </div>
+
+    <p id="status-error" class="status-msg error" role="alert"></p>
+    <p id="status-success" class="status-msg success" role="status"></p>
+
+    <a class="nav-link" href="admin.html">COMMS&gt; compose_</a>
+  </main>
+
+  <script src="posts-store.js"></script>
+  <script>
+    const DO_EPOCH = 1000;
+    const SIDEBAR_MAX = 21;
+
+    const clockEl = document.getElementById("clock");
+    const postListEl = document.getElementById("post-list");
+    const manageEmptyEl = document.getElementById("manage-empty");
+    const archiveBtn = document.getElementById("archive-btn");
+    const restoreBtn = document.getElementById("restore-btn");
+    const deleteBtn = document.getElementById("delete-btn");
+    const errorEl = document.getElementById("status-error");
+    const successEl = document.getElementById("status-success");
+
+    function doYear(date) {
+      return date.getFullYear() - DO_EPOCH;
+    }
+
+    function formatDoDate(date) {
+      const formatter = new Intl.DateTimeFormat(undefined, {
+        day: "numeric",
+        month: "numeric",
+        year: "numeric"
+      });
+      const parts = formatter.formatToParts(date);
+      let output = "";
+      for (const part of parts) {
+        if (part.type === "year") output += `${doYear(date)} d.O.`;
+        else output += part.value;
+      }
+      return output.replace(/\//g, ".").replace(/-/g, ".");
+    }
+
+    function formatLocalTime(date) {
+      return new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit"
+      }).format(date);
+    }
+
+    function updateClock() {
+      clockEl.textContent = `${formatDoDate(new Date())} ${formatLocalTime(new Date())}`;
+    }
+
+    function showError(message) {
+      successEl.classList.remove("is-visible");
+      errorEl.textContent = message;
+      errorEl.classList.add("is-visible");
+    }
+
+    function showSuccess(message) {
+      errorEl.classList.remove("is-visible");
+      successEl.textContent = message;
+      successEl.classList.add("is-visible");
+    }
+
+    function clearStatus() {
+      errorEl.classList.remove("is-visible");
+      successEl.classList.remove("is-visible");
+    }
+
+    function setBusy(isBusy) {
+      archiveBtn.disabled = isBusy;
+      restoreBtn.disabled = isBusy;
+      deleteBtn.disabled = isBusy;
+    }
+
+    function formatPostLabel(post) {
+      const date = formatDoDate(new Date(post.sentAt)).replace(" d.O.", "");
+      const text = post.lines.join(" ").trim().slice(0, SIDEBAR_MAX);
+      const prefix = post.archived ? "[ARCHIVED] " : "";
+      return `${prefix}${date} ${text}`;
+    }
+
+    function getSelectedPostIds() {
+      return [...postListEl.querySelectorAll('input[type="checkbox"]:checked')].map(
+        (input) => input.value
+      );
+    }
+
+    async function renderPostList() {
+      clearStatus();
+      postListEl.innerHTML = "";
+
+      let posts = [];
+      try {
+        posts = await SpaceCommsStore.fetchAllPosts();
+      } catch {
+        showError("[ERR] não foi possível carregar transmissões.");
+        manageEmptyEl.hidden = true;
+        return;
+      }
+
+      posts.sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
+
+      if (posts.length === 0) {
+        manageEmptyEl.hidden = false;
+        return;
+      }
+
+      manageEmptyEl.hidden = true;
+
+      for (const post of posts) {
+        const li = document.createElement("li");
+        const row = document.createElement("label");
+        row.className = "post-row" + (post.archived ? " is-archived" : "");
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = post.id;
+
+        const label = document.createElement("span");
+        label.className = "post-row__label";
+        label.textContent = formatPostLabel(post);
+
+        row.appendChild(checkbox);
+        row.appendChild(label);
+        li.appendChild(row);
+        postListEl.appendChild(li);
+      }
+    }
+
+    archiveBtn.addEventListener("click", async () => {
+      const ids = getSelectedPostIds();
+      if (ids.length === 0) {
+        showError("[ERR] selecione ao menos uma transmissão.");
+        return;
+      }
+
+      setBusy(true);
+      try {
+        const result = await SpaceCommsStore.archivePosts(ids, true);
+        showSuccess(`[SYS] archived // ${result.updated} transmission(s)`);
+        await renderPostList();
+      } catch (err) {
+        showError(`[ERR] ${err.message}`);
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    restoreBtn.addEventListener("click", async () => {
+      const ids = getSelectedPostIds();
+      if (ids.length === 0) {
+        showError("[ERR] selecione ao menos uma transmissão.");
+        return;
+      }
+
+      setBusy(true);
+      try {
+        const result = await SpaceCommsStore.archivePosts(ids, false);
+        showSuccess(`[SYS] restored // ${result.updated} transmission(s)`);
+        await renderPostList();
+      } catch (err) {
+        showError(`[ERR] ${err.message}`);
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    deleteBtn.addEventListener("click", async () => {
+      const ids = getSelectedPostIds();
+      if (ids.length === 0) {
+        showError("[ERR] selecione ao menos uma transmissão.");
+        return;
+      }
+
+      setBusy(true);
+      try {
+        const result = await SpaceCommsStore.deletePosts(ids);
+        showSuccess(`[SYS] deleted // ${result.removed} transmission(s)`);
+        await renderPostList();
+      } catch (err) {
+        showError(`[ERR] ${err.message}`);
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    renderPostList();
+  </script>
+</body>
+</html>
