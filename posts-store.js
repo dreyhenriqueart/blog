@@ -9,6 +9,52 @@
   const GH_BRANCH = "main";
   const GH_PATH = "posts.json";
   const TOKEN_KEY = "spacecomms-gh-token";
+  const BUS_NAME = "spacecomms-live";
+  const SNAP_KEY = "spacecomms-posts-snap";
+
+  function notifyLive(detail) {
+    try {
+      if (detail && Array.isArray(detail.posts)) {
+        localStorage.setItem(
+          SNAP_KEY,
+          JSON.stringify({ posts: detail.posts, t: Date.now() })
+        );
+      }
+      localStorage.setItem("spacecomms-live-ping", String(Date.now()));
+      const bus = new BroadcastChannel(BUS_NAME);
+      bus.postMessage(detail || { type: "posts-changed" });
+      bus.close();
+    } catch {
+      // ignore
+    }
+  }
+
+  function readLiveSnapshot(maxAgeMs) {
+    try {
+      const raw = localStorage.getItem(SNAP_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || !Array.isArray(data.posts)) return null;
+      if (maxAgeMs && Date.now() - Number(data.t || 0) > maxAgeMs) return null;
+      return data.posts;
+    } catch {
+      return null;
+    }
+  }
+
+  function onLiveChange(handler) {
+    try {
+      const bus = new BroadcastChannel(BUS_NAME);
+      bus.onmessage = (event) => handler(event.data || { type: "posts-changed" });
+    } catch {
+      // ignore
+    }
+    window.addEventListener("storage", (event) => {
+      if (event.key === "spacecomms-live-ping" || event.key === SNAP_KEY) {
+        handler({ type: "posts-changed" });
+      }
+    });
+  }
 
   function isLocalHost() {
     const h = location.hostname;
@@ -39,7 +85,16 @@
     return Array.isArray(data.posts) ? data.posts : [];
   }
 
-  async function fetchPublishedPosts() {
+  async function fetchPublishedPosts(options = {}) {
+    if (options.preferLive) {
+      const snap = readLiveSnapshot(120000);
+      if (snap) {
+        return snap
+          .filter((post) => !post.archived)
+          .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
+      }
+    }
+
     return (await fetchAllPosts())
       .filter((post) => !post.archived)
       .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
@@ -169,6 +224,7 @@
 
       try {
         await putPosts(token, { posts: working }, meta.sha, message);
+        notifyLive({ type: "posts-changed", posts: working });
         return result;
       } catch (err) {
         lastError = err;
@@ -183,6 +239,15 @@
     throw lastError || new Error("falha ao gravar posts.json");
   }
 
+  async function notifyAfterLocalMutate() {
+    try {
+      const posts = await fetchAllPosts();
+      notifyLive({ type: "posts-changed", posts });
+    } catch {
+      notifyLive({ type: "posts-changed" });
+    }
+  }
+
   async function publishPost(payload) {
     if (isLocalHost()) {
       const res = await fetch("api/posts", {
@@ -194,7 +259,9 @@
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      return res.json();
+      const created = await res.json();
+      await notifyAfterLocalMutate();
+      return created;
     }
 
     return mutateRemote((posts) => {
@@ -223,7 +290,9 @@
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      return res.json();
+      const result = await res.json();
+      await notifyAfterLocalMutate();
+      return result;
     }
 
     return mutateRemote((posts) => {
@@ -250,7 +319,9 @@
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      return res.json();
+      const result = await res.json();
+      await notifyAfterLocalMutate();
+      return result;
     }
 
     return mutateRemote((posts) => {
@@ -277,6 +348,9 @@
     getToken,
     setToken,
     ensureToken,
+    onLiveChange,
+    notifyLive,
+    readLiveSnapshot,
     GH_OWNER,
     GH_REPO
   };

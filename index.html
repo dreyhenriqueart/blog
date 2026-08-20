@@ -255,29 +255,33 @@
     }
 
     async function pollForNewPosts() {
-      if (isPreview || !bootComplete) return;
+      if (isPreview || !bootComplete || typing) return;
 
       try {
-        const fresh = (await SpaceCommsStore.fetchPublishedPosts()).map(parsePost);
+        const fresh = (await SpaceCommsStore.fetchPublishedPosts({ preferLive: true })).map(parsePost);
         const freshIds = new Set(fresh.map((post) => post.id));
-        const newcomers = fresh.filter((post) => !knownPostIds.has(post.id));
+        const newcomers = fresh
+          .filter((post) => !knownPostIds.has(post.id) && !post.lost)
+          .sort((a, b) => a.sentAt - b.sentAt);
         const signatureChanged = postsSignature(fresh) !== postsSignature(posts);
+        const prevActive = posts.find((p) => p.id === activePostId);
         const activeNow = fresh.find((p) => p.id === activePostId);
-        const activeBecameLost = activeNow && activeNow.lost && posts.find((p) => p.id === activePostId) && !posts.find((p) => p.id === activePostId).lost;
+        const activeBecameLost = Boolean(activeNow && activeNow.lost && prevActive && !prevActive.lost);
 
         if (newcomers.length === 0 && !signatureChanged) return;
 
         posts = fresh;
         knownPostIds = freshIds;
-
         renderSidebar();
 
-        if (activeBecameLost && !typing) {
+        if (activeBecameLost) {
           renderPostInstant(activeNow);
+          return;
         }
 
-        for (const post of newcomers) {
-          if (!post.lost) enqueuePost(post);
+        // Só transmite a mais recente entre as novas — nunca uma por uma
+        if (newcomers.length > 0) {
+          enqueuePost(newcomers[newcomers.length - 1]);
         }
       } catch {
         // uplink retry on next poll
@@ -287,6 +291,11 @@
     function startLiveListener() {
       if (isPreview) return;
       setInterval(pollForNewPosts, POLL_MS);
+      if (SpaceCommsStore.onLiveChange) {
+        SpaceCommsStore.onLiveChange(() => {
+          pollForNewPosts();
+        });
+      }
     }
 
     function doYear(date) {
@@ -540,14 +549,18 @@
       posts = await loadPosts();
       if (posts.length === 0) return;
 
+      // Marca todos como conhecidos ANTES de qualquer transmissão
       knownPostIds = new Set(posts.map((post) => post.id));
 
       const latest = getLatestPost();
       activePostId = latest.id;
+
+      // Lateral já mostra todas as passadas (e Lost), sem digitar uma por uma
       renderSidebar();
 
       clearFeed();
       await runBoot();
+      // Só a última (alive) é transmitida
       await transmitPost(latest);
       startLiveListener();
     }

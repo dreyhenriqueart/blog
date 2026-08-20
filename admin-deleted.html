@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>COMMS // ADMIN EDIT</title>
+  <title>COMMS // ADMIN DELETED</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -82,42 +82,31 @@
 
     #post-list { list-style: none; margin-bottom: 1rem; }
 
-    .post-item { margin-bottom: 0.15rem; }
-
     .post-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
-      line-height: 1.55;
-    }
-
-    .post-row input[type="checkbox"] {
-      width: auto;
-      margin: 0.2rem 0 0;
-      accent-color: var(--fg);
-    }
-
-    .post-row__name {
+      display: block;
+      width: 100%;
+      text-align: left;
       background: none;
       border: none;
       font: inherit;
-      font-size: 13px;
       color: var(--fg-dim);
-      cursor: pointer;
+      font-size: 13px;
+      line-height: 1.55;
       padding: 0;
-      text-align: left;
+      cursor: pointer;
       white-space: nowrap;
       overflow: hidden;
     }
-    .post-row__name:hover,
-    .post-row__name.is-open { color: var(--fg); }
+    .post-row:hover,
+    .post-row.is-open { color: var(--fg); }
 
     .post-preview {
       display: none;
       color: var(--fg);
       font-size: 13px;
       white-space: pre-wrap;
-      margin: 0.25rem 0 0.75rem 1.35rem;
+      margin: 0.35rem 0 0.85rem;
+      padding-left: 0;
     }
     .post-preview.is-open { display: block; }
 
@@ -127,12 +116,9 @@
       margin-bottom: 1rem;
     }
 
-    .actions {
-      margin-top: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
+    .status-msg { margin-top: 0.75rem; display: none; }
+    .status-msg.is-visible { display: block; }
+    .error { color: var(--fg); }
 
     button {
       background: none;
@@ -144,12 +130,6 @@
       text-align: left;
     }
     button:hover { color: var(--fg-dim); }
-    button:disabled { color: var(--fg-muted); cursor: wait; }
-
-    .status-msg { margin-top: 0.75rem; display: none; }
-    .status-msg.is-visible { display: block; }
-    .error { color: var(--fg); }
-    .success { color: var(--fg-dim); }
 
     .auth-gate { max-width: 720px; padding: 1rem 16px 2rem; }
   </style>
@@ -159,24 +139,18 @@
     <header class="status-bar">
       COMMS ADMIN v0.1 &nbsp;|&nbsp;
       <span id="clock">--</span> &nbsp;|&nbsp;
-      MODE: <span>EDIT</span>
+      MODE: <span>DELETED</span>
     </header>
 
-    <p class="sys-line">[SYS] transmission registry open</p>
-    <p class="sys-line">[SYS] click name to read · checkbox + delete to mark Lost</p>
+    <p class="sys-line">[SYS] lost transmissions registry</p>
+    <p class="sys-line">[SYS] click a name to read original text</p>
 
-    <div class="manage-title">Transmissions</div>
+    <div class="manage-title">Deleted</div>
     <ul id="post-list"></ul>
-    <p id="manage-empty" class="manage-empty" hidden>[SYS] no transmissions stored</p>
-
-    <div class="actions">
-      <button type="button" id="delete-btn">COMMS&gt; delete selected_</button>
-    </div>
-
+    <p id="manage-empty" class="manage-empty" hidden>[SYS] no deleted transmissions</p>
     <p id="status-error" class="status-msg error" role="alert"></p>
-    <p id="status-success" class="status-msg success" role="status"></p>
 
-    <a class="nav-link" href="admin-deleted.html">COMMS&gt; deleted_</a>
+    <a class="nav-link" href="admin-edit.html">COMMS&gt; edit_</a>
     <a class="nav-link" href="admin.html">COMMS&gt; compose_</a>
   </main>
 
@@ -189,9 +163,7 @@
     const clockEl = document.getElementById("clock");
     const postListEl = document.getElementById("post-list");
     const manageEmptyEl = document.getElementById("manage-empty");
-    const deleteBtn = document.getElementById("delete-btn");
     const errorEl = document.getElementById("status-error");
-    const successEl = document.getElementById("status-success");
 
     function doYear(date) { return date.getFullYear() - DO_EPOCH; }
 
@@ -222,24 +194,8 @@
     }
 
     function showError(message) {
-      successEl.classList.remove("is-visible");
       errorEl.textContent = message;
       errorEl.classList.add("is-visible");
-    }
-
-    function showSuccess(message) {
-      errorEl.classList.remove("is-visible");
-      successEl.textContent = message;
-      successEl.classList.add("is-visible");
-    }
-
-    function clearStatus() {
-      errorEl.classList.remove("is-visible");
-      successEl.classList.remove("is-visible");
-    }
-
-    function setBusy(isBusy) {
-      deleteBtn.disabled = isBusy;
     }
 
     function formatPostLabel(post) {
@@ -248,22 +204,16 @@
       return `${date} ${text}`;
     }
 
-    function getSelectedPostIds() {
-      return [...postListEl.querySelectorAll('input[type="checkbox"]:checked')].map(
-        (input) => input.value
-      );
-    }
-
     async function renderPostList() {
-      clearStatus();
+      errorEl.classList.remove("is-visible");
       postListEl.innerHTML = "";
 
       let posts = [];
       try {
         posts = await SpaceCommsStore.fetchAllPosts({ fresh: true });
-        posts = posts.filter((post) => !post.lost);
+        posts = posts.filter((post) => post.lost);
       } catch {
-        showError("[ERR] não foi possível carregar transmissões.");
+        showError("[ERR] não foi possível carregar deletados.");
         manageEmptyEl.hidden = true;
         return;
       }
@@ -278,62 +228,25 @@
 
       for (const post of posts) {
         const li = document.createElement("li");
-        li.className = "post-item";
 
-        const row = document.createElement("div");
-        row.className = "post-row";
-
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.value = post.id;
-
-        const nameBtn = document.createElement("button");
-        nameBtn.type = "button";
-        nameBtn.className = "post-row__name";
-        nameBtn.textContent = formatPostLabel(post);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "post-row";
+        btn.textContent = formatPostLabel(post);
 
         const preview = document.createElement("div");
         preview.className = "post-preview";
         preview.textContent = post.lines.join("\n");
 
-        nameBtn.addEventListener("click", () => {
+        btn.addEventListener("click", () => {
           const open = preview.classList.toggle("is-open");
-          nameBtn.classList.toggle("is-open", open);
+          btn.classList.toggle("is-open", open);
         });
 
-        row.appendChild(checkbox);
-        row.appendChild(nameBtn);
-        li.appendChild(row);
+        li.appendChild(btn);
         li.appendChild(preview);
         postListEl.appendChild(li);
       }
-    }
-
-    function bindEdit() {
-      deleteBtn.addEventListener("click", async () => {
-        const ids = getSelectedPostIds();
-        if (ids.length === 0) {
-          showError("[ERR] selecione ao menos uma transmissão.");
-          return;
-        }
-
-        setBusy(true);
-        try {
-          const result = await SpaceCommsStore.deletePosts(ids);
-          if (!result.removed) {
-            showError("[ERR] nenhuma transmissão removida.");
-          } else {
-            showSuccess(`[SYS] moved to deleted // ${result.removed}`);
-          }
-          await renderPostList();
-        } catch (err) {
-          showError(`[ERR] ${err.message}`);
-        } finally {
-          setBusy(false);
-        }
-      });
-
-      renderPostList();
     }
 
     updateClock();
@@ -341,7 +254,7 @@
 
     SpaceCommsAuth.mountGate({
       onReady() {
-        bindEdit();
+        renderPostList();
       }
     });
   </script>

@@ -53,6 +53,7 @@ function Add-Post($payload) {
     callsign = $callsign.Trim()
     lines    = @($lines | ForEach-Object { [string]$_ })
     archived = $false
+    lost     = $false
   }
 
   $data.posts = @($data.posts) + @($newPost)
@@ -80,11 +81,18 @@ function Remove-Posts($ids) {
     throw "no posts to remove"
   }
 
-  $before = @($data.posts).Count
-  $data.posts = @($data.posts | Where-Object { $targetIds -notcontains [string]$_.id })
-  $removed = $before - @($data.posts).Count
+  $before = 0
+  foreach ($post in @($data.posts)) {
+    if ($targetIds -contains [string]$post.id) {
+      if ($null -eq $post.lost -or -not [bool]$post.lost) {
+        $post | Add-Member -NotePropertyName lost -NotePropertyValue $true -Force
+        $post.lost = $true
+        $before++
+      }
+    }
+  }
 
-  if ($removed -eq 0) {
+  if ($before -eq 0) {
     throw "posts not found"
   }
 
@@ -92,7 +100,7 @@ function Remove-Posts($ids) {
   [System.IO.File]::WriteAllText($PostsFile, $json, [System.Text.Encoding]::UTF8)
 
   return @{
-    removed = $removed
+    removed = $before
     ids     = $targetIds
   }
 }
