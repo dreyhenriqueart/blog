@@ -344,9 +344,13 @@
     }
 
     function getLatestPost() {
-      const alive = posts.filter((p) => !p.lost);
-      if (alive.length) return alive[alive.length - 1];
+      // Sempre a mais recente por tempo — inclusive se estiver Lost
       return posts[posts.length - 1];
+    }
+
+    function buildTransmissionEnd(endedAt) {
+      const stamp = formatIncomingStamp(endedAt);
+      return `[${stamp}] << TRANSMISSION END //`;
     }
 
     function rand(min, max) {
@@ -424,12 +428,12 @@
       createLine("meta", buildIncomingHeader(post));
       createLine("blank");
       createLine("blank");
-      let lastBodyLine = null;
       for (const line of displayLines(post)) {
-        lastBodyLine = createLine("body", line);
+        createLine("body", line);
       }
+      const endLine = createLine("meta", buildTransmissionEnd(new Date()));
       createLine("sep", SEPARATOR);
-      if (lastBodyLine) attachCursor(lastBodyLine);
+      attachCursor(endLine);
     }
 
     async function transmitPost(post) {
@@ -441,14 +445,14 @@
       await typeLine("blank", "");
       await delay(rand(80, 160));
 
-      let lastBodyLine = null;
       for (const line of displayLines(post)) {
-        lastBodyLine = await typeLine("body", line);
+        await typeLine("body", line);
         await delay(rand(180, 420));
       }
 
+      const endLine = await typeLine("meta", buildTransmissionEnd(new Date()));
       createLine("sep", SEPARATOR);
-      if (lastBodyLine) attachCursor(lastBodyLine);
+      attachCursor(endLine);
     }
 
     function renderSidebar() {
@@ -560,7 +564,7 @@
 
       clearFeed();
       await runBoot();
-      // Só a última (alive) é transmitida
+      // Só a última é transmitida (mesmo se Lost → "signal lost")
       await transmitPost(latest);
       startLiveListener();
     }
