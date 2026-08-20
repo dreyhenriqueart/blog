@@ -36,34 +36,30 @@
   }
 
   function getToken() {
-    return localStorage.getItem(TOKEN_KEY) || "";
+    return sessionStorage.getItem(TOKEN_KEY) || "";
   }
 
   function setToken(token) {
-    if (token) localStorage.setItem(TOKEN_KEY, token.trim());
-    else localStorage.removeItem(TOKEN_KEY);
+    if (token) sessionStorage.setItem(TOKEN_KEY, token.trim());
+    else sessionStorage.removeItem(TOKEN_KEY);
   }
 
   async function ensureToken() {
+    if (isLocalHost()) return "";
+
     let token = getToken();
     if (token) return token;
 
-    if (isLocalHost()) {
-      throw new Error("use o servidor local (serve.bat) para gravar posts");
+    if (global.SpaceCommsAuth && typeof global.SpaceCommsAuth.unlockUplink === "function") {
+      global.SpaceCommsAuth.unlockUplink();
+      token = getToken();
     }
 
-    if (global.SpaceCommsAuth && typeof global.SpaceCommsAuth.askGitHubToken === "function") {
-      token = await global.SpaceCommsAuth.askGitHubToken();
-    } else {
-      throw new Error("uplink key necessária para publicar");
+    if (!token) {
+      throw new Error("faça login no admin (senha) para gravar");
     }
 
-    if (!token || !String(token).trim()) {
-      throw new Error("uplink key necessária para publicar");
-    }
-
-    setToken(String(token).trim());
-    return getToken();
+    return token;
   }
 
   function nextId(posts) {

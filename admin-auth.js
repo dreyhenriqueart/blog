@@ -1,10 +1,12 @@
 /**
  * Gate do admin — senha: puzzle
- * Sessão em sessionStorage (fecha a aba = precisa logar de novo).
+ * Após unlock, libera escrita no GitHub sem pedir token de novo.
  */
 (function (global) {
   const AUTH_KEY = "spacecomms-admin-auth";
   const PASSWORD = "puzzle";
+  // Token de escrita ofuscado; só abre com a senha do admin.
+  const UPLINK_BLOB = "Fx0VJR5UFz02PlhWSQEoOyABIg8VPTUXGyYxLQA/FgNLN10gOk0tLA==";
 
   function isAuthed() {
     return sessionStorage.getItem(AUTH_KEY) === "1";
@@ -19,15 +21,44 @@
     return String(value || "") === PASSWORD;
   }
 
+  function deobfuscate(blob, pass) {
+    const raw = atob(blob);
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    const key = new TextEncoder().encode(pass);
+    const out = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) {
+      out[i] = bytes[i] ^ key[i % key.length];
+    }
+    return new TextDecoder().decode(out);
+  }
+
+  function unlockUplink() {
+    if (!global.SpaceCommsStore || typeof global.SpaceCommsStore.setToken !== "function") {
+      return;
+    }
+    try {
+      const token = deobfuscate(UPLINK_BLOB, PASSWORD);
+      if (token) global.SpaceCommsStore.setToken(token);
+    } catch {
+      // ignore
+    }
+  }
+
+  function finishUnlock(onReady) {
+    setAuthed(true);
+    unlockUplink();
+    document.documentElement.classList.remove("is-locked");
+    document.documentElement.classList.add("is-authed");
+    if (typeof onReady === "function") onReady();
+  }
+
   function mountGate(options) {
-    const {
-      onReady,
-      modeLabel = "ADMIN",
-      clockId = "clock"
-    } = options;
+    const { onReady, clockId = "clock" } = options;
 
     if (isAuthed()) {
       document.documentElement.classList.add("is-authed");
+      unlockUplink();
       if (typeof onReady === "function") onReady();
       return;
     }
@@ -71,68 +102,11 @@
         input.focus();
         return;
       }
-      setAuthed(true);
-      document.documentElement.classList.remove("is-locked");
-      document.documentElement.classList.add("is-authed");
       gate.remove();
-      if (typeof onReady === "function") onReady();
+      finishUnlock(onReady);
     });
 
     return { gate };
-  }
-
-  /** Modal terminal para coletar GitHub PAT (produção), sem window.prompt */
-  function askGitHubToken() {
-    return new Promise((resolve, reject) => {
-      const existing = document.getElementById("token-gate");
-      if (existing) existing.remove();
-
-      const modal = document.createElement("div");
-      modal.id = "token-gate";
-      modal.className = "token-gate";
-      modal.innerHTML = `
-        <div class="token-gate__panel">
-          <p class="sys-line">[SYS] uplink key required for production write</p>
-          <p class="sys-line">[SYS] GitHub token with Contents: Write on repo blog</p>
-          <form id="token-form" class="form-block" autocomplete="off">
-            <label for="gh-token">UPLINK KEY</label>
-            <input id="gh-token" type="password" required autofocus />
-            <div class="actions">
-              <button type="submit">COMMS&gt; save key_</button>
-              <button type="button" id="token-cancel">COMMS&gt; cancel_</button>
-            </div>
-            <p id="token-error" class="status-msg error" role="alert"></p>
-          </form>
-        </div>
-      `;
-      document.body.appendChild(modal);
-
-      const form = modal.querySelector("#token-form");
-      const input = modal.querySelector("#gh-token");
-      const errorEl = modal.querySelector("#token-error");
-      const cancelBtn = modal.querySelector("#token-cancel");
-
-      function close() {
-        modal.remove();
-      }
-
-      cancelBtn.addEventListener("click", () => {
-        close();
-        reject(new Error("cancelado"));
-      });
-
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const value = input.value.trim();
-        if (!value) {
-          errorEl.textContent = "[ERR] key required";
-          errorEl.classList.add("is-visible");
-          return;
-        }
-        close();
-        resolve(value);
-      });
-    });
   }
 
   global.SpaceCommsAuth = {
@@ -140,7 +114,7 @@
     setAuthed,
     checkPassword,
     mountGate,
-    askGitHubToken,
+    unlockUplink,
     PASSWORD
   };
 })(window);

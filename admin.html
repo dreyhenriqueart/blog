@@ -111,24 +111,8 @@
     .error { color: var(--fg); }
     .success { color: var(--fg-dim); }
 
-    .auth-gate,
-    .token-gate {
+    .auth-gate {
       max-width: 640px;
-      padding: 1rem 16px 2rem;
-    }
-
-    .token-gate {
-      position: fixed;
-      inset: 0;
-      background: rgba(240, 237, 230, 0.96);
-      z-index: 20;
-      display: flex;
-      align-items: flex-start;
-    }
-
-    .token-gate__panel {
-      max-width: 640px;
-      width: 100%;
       padding: 1rem 16px 2rem;
     }
   </style>
@@ -160,7 +144,7 @@
 
       <p id="error" class="status-msg error" role="alert"></p>
       <p id="success" class="status-msg success" role="status"></p>
-      <p class="hint">Senha do admin: puzzle. Em produção, a primeira publicação pede a uplink key (token GitHub) uma vez.</p>
+      <p class="hint">Entre com a senha do admin. Depois disso, publish e edit funcionam sem pedir nada.</p>
     </form>
 
     <a class="nav-link" href="admin-edit.html">COMMS&gt; edit_</a>
