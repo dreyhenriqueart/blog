@@ -74,11 +74,13 @@
   }
 
   async function getFileMeta(token) {
-    const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}`;
+    const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}?ref=${GH_BRANCH}&t=${Date.now()}`;
     const res = await fetch(url, {
+      cache: "no-store",
       headers: {
         Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
+        "Cache-Control": "no-cache"
       }
     });
     if (!res.ok) {
@@ -89,18 +91,28 @@
   }
 
   function decodeContent(meta) {
-    const bin = atob(meta.content.replace(/\n/g, ""));
+    const bin = atob(String(meta.content || "").replace(/\s/g, ""));
     const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
     return JSON.parse(new TextDecoder().decode(bytes));
   }
 
-  async function putPosts(token, data, sha, message) {
+  function encodeContent(data) {
     const json = JSON.stringify(data, null, 2);
-    const content = btoa(unescape(encodeURIComponent(json)));
+    const bytes = new TextEncoder().encode(json);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  async function putPosts(token, data, sha, message) {
+    const content = encodeContent(data);
     const res = await fetch(
       `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}`,
       {
         method: "PUT",
+        cache: "no-store",
         headers: {
           Accept: "application/vnd.github+json",
           Authorization: `Bearer ${token}`,
@@ -116,19 +128,42 @@
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || `GitHub PUT ${res.status}`);
+      const msg = err.message || `GitHub PUT ${res.status}`;
+      const error = new Error(msg);
+      error.status = res.status;
+      error.shaConflict = /does not match/i.test(msg) || res.status === 409;
+      throw error;
     }
     return res.json();
   }
 
   async function mutateRemote(mutator, message) {
     const token = await ensureToken();
-    const meta = await getFileMeta(token);
-    const data = decodeContent(meta);
-    if (!Array.isArray(data.posts)) data.posts = [];
-    const result = mutator(data.posts);
-    await putPosts(token, { posts: data.posts }, meta.sha, message);
-    return result;
+    let lastError = null;
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const meta = await getFileMeta(token);
+      const data = decodeContent(meta);
+      if (!Array.isArray(data.posts)) data.posts = [];
+
+      // Cópia para o mutator não corromper retry com dados pela metade
+      const working = JSON.parse(JSON.stringify(data.posts));
+      const result = mutator(working);
+
+      try {
+        await putPosts(token, { posts: working }, meta.sha, message);
+        return result;
+      } catch (err) {
+        lastError = err;
+        if (err.shaConflict && attempt < 3) {
+          await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw lastError || new Error("falha ao gravar posts.json");
   }
 
   async function publishPost(payload) {
@@ -175,9 +210,9 @@
 
     return mutateRemote((posts) => {
       const before = posts.length;
-      const keep = posts.filter((p) => !ids.includes(String(p.id)));
-      posts.length = 0;
-      posts.push(...keep);
+      const idSet = new Set(ids.map(String));
+      const keep = posts.filter((p) => !idSet.has(String(p.id)));
+      posts.splice(0, posts.length, ...keep);
       return { removed: before - keep.length, ids };
     }, `delete transmissions ${ids.join(",")}`);
   }
@@ -198,8 +233,9 @@
 
     return mutateRemote((posts) => {
       let updated = 0;
+      const idSet = new Set(ids.map(String));
       for (const post of posts) {
-        if (ids.includes(String(post.id))) {
+        if (idSet.has(String(post.id))) {
           post.archived = Boolean(archived);
           updated++;
         }
