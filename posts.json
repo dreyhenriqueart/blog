@@ -20,7 +20,8 @@
       "lines": [
         "teste teste 01"
       ],
-      "archived": false
+      "archived": false,
+      "lost": true
     }
   ]
 }
