@@ -225,8 +225,14 @@
         sentAt: new Date(raw.sentAt),
         origin: raw.origin,
         callsign: raw.callsign,
-        lines: Array.isArray(raw.lines) ? raw.lines : [String(raw.lines || "")]
+        lines: Array.isArray(raw.lines) ? raw.lines : [String(raw.lines || "")],
+        lost: Boolean(raw.lost)
       };
+    }
+
+    function displayLines(post) {
+      if (post.lost) return ["signal lost"];
+      return post.lines;
     }
 
     async function loadPosts() {
@@ -244,6 +250,10 @@
       return published.map(parsePost);
     }
 
+    function postsSignature(list) {
+      return list.map((p) => `${p.id}:${p.lost ? 1 : 0}`).join("|");
+    }
+
     async function pollForNewPosts() {
       if (isPreview || !bootComplete) return;
 
@@ -251,30 +261,23 @@
         const fresh = (await SpaceCommsStore.fetchPublishedPosts()).map(parsePost);
         const freshIds = new Set(fresh.map((post) => post.id));
         const newcomers = fresh.filter((post) => !knownPostIds.has(post.id));
-        const removedAny = posts.some((post) => !freshIds.has(post.id));
-        const activeRemoved = activePostId && !freshIds.has(activePostId);
+        const signatureChanged = postsSignature(fresh) !== postsSignature(posts);
+        const activeNow = fresh.find((p) => p.id === activePostId);
+        const activeBecameLost = activeNow && activeNow.lost && posts.find((p) => p.id === activePostId) && !posts.find((p) => p.id === activePostId).lost;
 
-        if (newcomers.length === 0 && !removedAny) return;
+        if (newcomers.length === 0 && !signatureChanged) return;
 
         posts = fresh;
         knownPostIds = freshIds;
 
         renderSidebar();
 
-        if (activeRemoved) {
-          const latest = getLatestPost();
-          if (latest) {
-            activePostId = latest.id;
-            updateSidebarActive();
-            if (!typing) renderPostInstant(latest);
-          } else {
-            activePostId = null;
-            if (!typing) clearFeed();
-          }
+        if (activeBecameLost && !typing) {
+          renderPostInstant(activeNow);
         }
 
         for (const post of newcomers) {
-          enqueuePost(post);
+          if (!post.lost) enqueuePost(post);
         }
       } catch {
         // uplink retry on next poll
@@ -326,11 +329,14 @@
 
     function formatSidebarLabel(post) {
       const date = formatDoDate(post.sentAt).replace(" d.O.", "");
+      if (post.lost) return `${date} Lost`;
       const text = post.lines.join(" ").trim().slice(0, SIDEBAR_MAX);
       return `${date} ${text}`;
     }
 
     function getLatestPost() {
+      const alive = posts.filter((p) => !p.lost);
+      if (alive.length) return alive[alive.length - 1];
       return posts[posts.length - 1];
     }
 
@@ -410,7 +416,7 @@
       createLine("blank");
       createLine("blank");
       let lastBodyLine = null;
-      for (const line of post.lines) {
+      for (const line of displayLines(post)) {
         lastBodyLine = createLine("body", line);
       }
       createLine("sep", SEPARATOR);
@@ -427,7 +433,7 @@
       await delay(rand(80, 160));
 
       let lastBodyLine = null;
-      for (const line of post.lines) {
+      for (const line of displayLines(post)) {
         lastBodyLine = await typeLine("body", line);
         await delay(rand(180, 420));
       }

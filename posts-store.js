@@ -204,7 +204,8 @@
         origin: payload.origin,
         callsign: payload.callsign,
         lines: payload.lines,
-        archived: false
+        archived: false,
+        lost: false
       };
       posts.push(created);
       return created;
@@ -226,12 +227,16 @@
     }
 
     return mutateRemote((posts) => {
-      const before = posts.length;
+      let updated = 0;
       const idSet = new Set(ids.map(String));
-      const keep = posts.filter((p) => !idSet.has(String(p.id)));
-      posts.splice(0, posts.length, ...keep);
-      return { removed: before - keep.length, ids };
-    }, `delete transmissions ${ids.join(",")}`);
+      for (const post of posts) {
+        if (idSet.has(String(post.id)) && !post.lost) {
+          post.lost = true;
+          updated++;
+        }
+      }
+      return { removed: updated, ids };
+    }, `signal lost ${ids.join(",")}`);
   }
 
   async function archivePosts(ids, archived) {

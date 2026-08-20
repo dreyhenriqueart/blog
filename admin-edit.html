@@ -265,6 +265,7 @@
       let posts = [];
       try {
         posts = await SpaceCommsStore.fetchAllPosts({ fresh: true });
+        posts = posts.filter((post) => !post.lost);
       } catch {
         showError("[ERR] não foi possível carregar transmissões.");
         manageEmptyEl.hidden = true;
@@ -314,7 +315,7 @@
           if (!result.removed) {
             showError("[ERR] nenhuma transmissão removida.");
           } else {
-            showSuccess(`[SYS] deleted // ${result.removed} transmission(s)`);
+            showSuccess(`[SYS] signal lost // ${result.removed} transmission(s)`);
           }
           await renderPostList();
         } catch (err) {
