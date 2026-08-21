@@ -11,7 +11,7 @@
         "Eu não perdi o juízo. Só chega um ponto em que você se acostuma e deixa fluir, deixa ir, desapega"
       ],
       "archived": false,
-      "lost": false
+      "lost": true
     },
     {
       "id": "002",
@@ -24,7 +24,7 @@
         "Eu não perdi o juízo. Só chega um ponto em que você se acostuma e deixa fluir, deixa ir, desapega"
       ],
       "archived": false,
-      "lost": false
+      "lost": true
     }
   ]
 }
