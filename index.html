@@ -283,18 +283,18 @@
             return;
           }
           const latest = getLatestPost();
-          enqueuePost(latest);
+          enqueuePost(latest, { typeBody: false });
           return;
         }
 
         if (activeBecameLost) {
-          enqueuePost(activeNow);
+          enqueuePost(activeNow, { typeBody: false });
           return;
         }
 
-        // Só transmite a mais recente entre as novas — nunca uma por uma
+        // Só transmite (com cursor) a mais recente entre as novas
         if (newcomers.length > 0) {
-          enqueuePost(newcomers[newcomers.length - 1]);
+          enqueuePost(newcomers[newcomers.length - 1], { typeBody: true });
         }
       } catch {
         // uplink retry on next poll
@@ -444,25 +444,34 @@
       return `[${stamp}] << INCOMING // ORIGIN: ${post.origin} / CALLSIGN ${post.callsign}`;
     }
 
-    function renderPostInstant(post) {
-      clearFeed();
-      createLine("meta", buildIncomingHeader(post));
-      createLine("blank");
-      createLine("blank");
+    /** Bloco inteiro linha a linha (sem digitar). Usado no boot, lateral e signal lost. */
+    async function revealPost(post) {
+      await delay(rand(120, 240));
+
+      await revealLine("meta", buildIncomingHeader(post), rand(160, 280));
+      await revealLine("blank", "", rand(80, 140));
+      await revealLine("blank", "", rand(80, 140));
+
       let lastBodyLine = null;
       for (const line of displayLines(post)) {
-        lastBodyLine = createLine("body", line);
+        lastBodyLine = await revealLine("body", String(line), rand(160, 280));
       }
-      createLine("blank");
-      createLine("meta", buildTransmissionEnd(new Date()));
+
+      await revealLine("blank", "", rand(80, 140));
+      await revealLine("meta", buildTransmissionEnd(new Date()), rand(160, 280));
       createLine("sep", SEPARATOR);
       if (lastBodyLine) attachCursor(lastBodyLine);
     }
 
+    /** Só mensagens novas: corpo digitado com cursor. Lost → revealPost. */
     async function transmitPost(post) {
+      if (post.lost) {
+        await revealPost(post);
+        return;
+      }
+
       await delay(rand(180, 360));
 
-      // INCOMING / blanks / END: linha inteira. Só o corpo digita com cursor.
       await revealLine("meta", buildIncomingHeader(post), rand(160, 280));
       await revealLine("blank", "", rand(80, 140));
       await revealLine("blank", "", rand(80, 140));
@@ -491,7 +500,7 @@
         btn.className = "archive-item";
         btn.dataset.postId = post.id;
         btn.textContent = formatSidebarLabel(post);
-        btn.addEventListener("click", () => selectPost(post.id, { animate: true }));
+        btn.addEventListener("click", () => selectPost(post.id));
         li.appendChild(btn);
         archiveEl.appendChild(li);
       }
@@ -505,28 +514,18 @@
       });
     }
 
-    async function selectPost(postId, { animate = true, skipBoot = true } = {}) {
+    async function selectPost(postId) {
       const post = posts.find((p) => String(p.id) === String(postId));
       if (!post || typing) return;
 
       activePostId = post.id;
       updateSidebarActive();
 
-      if (!animate) {
-        renderPostInstant(post);
-        return;
-      }
-
       typing = true;
       listenerEl.textContent = "RX";
       try {
-        if (!skipBoot) {
-          clearFeed();
-          await runBoot();
-        } else {
-          clearFeed();
-        }
-        await transmitPost(post);
+        clearFeed();
+        await revealPost(post);
       } finally {
         typing = false;
         listenerEl.textContent = "ACTIVE";
@@ -552,11 +551,14 @@
 
       try {
         while (queue.length > 0) {
-          const post = queue.shift();
+          const item = queue.shift();
+          const post = item.post;
+          const typeBody = Boolean(item.typeBody) && !post.lost;
           activePostId = post.id;
           updateSidebarActive();
           clearFeed();
-          await transmitPost(post);
+          if (typeBody) await transmitPost(post);
+          else await revealPost(post);
         }
       } finally {
         typing = false;
@@ -564,8 +566,8 @@
       }
     }
 
-    function enqueuePost(post) {
-      queue.push(post);
+    function enqueuePost(post, { typeBody = false } = {}) {
+      queue.push({ post, typeBody });
       processQueue();
     }
 
@@ -623,7 +625,7 @@
       typing = true;
       listenerEl.textContent = "RX";
       try {
-        await transmitPost(latest);
+        await revealPost(latest);
       } finally {
         typing = false;
         listenerEl.textContent = "ACTIVE";
