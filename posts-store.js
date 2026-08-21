@@ -98,8 +98,8 @@
   async function fetchPublishedPosts(options = {}) {
     if (options.preferLive) {
       const snap = readLiveSnapshot(120000);
-      // Snapshot vazio (purge total) não deve bloquear o posts.json real
-      if (snap && snap.length > 0) {
+      // null = sem snap; [] = purge total recente (aceitar no live poll)
+      if (snap !== null && (snap.length > 0 || options.allowEmpty)) {
         return snap
           .filter((post) => !post.archived)
           .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));

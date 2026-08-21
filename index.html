@@ -349,7 +349,10 @@
       if (isPreview || !bootComplete || typing) return;
 
       try {
-        const fresh = (await SpaceCommsStore.fetchPublishedPosts({ preferLive: true })).map(parsePost);
+        const fresh = (await SpaceCommsStore.fetchPublishedPosts({
+          preferLive: true,
+          allowEmpty: true
+        })).map(parsePost);
         const freshIds = new Set(fresh.map((post) => post.id));
         const newcomers = fresh
           .filter((post) => !knownPostIds.has(post.id) && !post.lost)
