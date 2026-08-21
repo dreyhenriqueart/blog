@@ -279,7 +279,7 @@
         knownPostIds = freshIds;
         renderSidebar();
 
-        const activeStillExists = fresh.some((p) => p.id === activePostId);
+        const activeStillExists = fresh.some((p) => String(p.id) === String(activePostId));
         if (!activeStillExists) {
           if (fresh.length === 0) {
             clearFeed();
@@ -287,14 +287,12 @@
             return;
           }
           const latest = getLatestPost();
-          activePostId = latest.id;
-          updateSidebarActive();
-          renderPostInstant(latest);
+          enqueuePost(latest);
           return;
         }
 
         if (activeBecameLost) {
-          renderPostInstant(activeNow);
+          enqueuePost(activeNow);
           return;
         }
 
@@ -418,13 +416,14 @@
       activeCursor = null;
     }
 
-    async function typeText(lineEl, text, speedMin = 22, speedMax = 48) {
+    async function typeText(lineEl, text, speedMin = 28, speedMax = 56) {
+      const chars = String(text ?? "");
       attachCursor(lineEl);
-      for (let i = 0; i < text.length; i++) {
-        const ch = text[i];
+      for (let i = 0; i < chars.length; i++) {
+        const ch = chars[i];
         lineEl.insertBefore(document.createTextNode(ch), activeCursor);
         let pause = rand(speedMin, speedMax);
-        if (ch === "." || ch === ",") pause += rand(80, 180);
+        if (ch === "." || ch === "," || ch === "…" ) pause += rand(80, 180);
         if (ch === "\n") pause += rand(120, 280);
         await delay(pause);
       }
@@ -437,7 +436,7 @@
     }
 
     async function revealLine(type, text, pauseMs) {
-      removeCursor();
+      // Não remove o cursor — o blink fica no fim do corpo da mensagem
       const lineEl = createLine(type, text === undefined ? "" : text);
       await delay(pauseMs ?? rand(420, 680));
       return lineEl;
@@ -468,9 +467,8 @@
 
     async function transmitPost(post) {
       await delay(rand(400, 900));
-      removeCursor();
 
-      // INCOMING / blanks / END: linha inteira de uma vez. Só o corpo digita.
+      // INCOMING / blanks / END: linha inteira. Só o corpo digita com cursor.
       await revealLine("meta", buildIncomingHeader(post));
       await revealLine("blank", "", rand(180, 320));
       await revealLine("blank", "", rand(180, 320));
@@ -478,11 +476,10 @@
 
       let lastBodyLine = null;
       for (const line of displayLines(post)) {
-        lastBodyLine = await typeLine("body", line);
+        lastBodyLine = await typeLine("body", String(line));
         await delay(rand(180, 420));
       }
 
-      removeCursor();
       await revealLine("blank", "", rand(180, 320));
       await revealLine("meta", buildTransmissionEnd(new Date()));
       createLine("sep", SEPARATOR);
@@ -500,7 +497,7 @@
         btn.className = "archive-item";
         btn.dataset.postId = post.id;
         btn.textContent = formatSidebarLabel(post);
-        btn.addEventListener("click", () => selectPost(post.id, { animate: false }));
+        btn.addEventListener("click", () => selectPost(post.id, { animate: true }));
         li.appendChild(btn);
         archiveEl.appendChild(li);
       }
@@ -510,18 +507,25 @@
 
     function updateSidebarActive() {
       archiveEl.querySelectorAll(".archive-item").forEach((btn) => {
-        btn.classList.toggle("is-active", btn.dataset.postId === activePostId);
+        btn.classList.toggle("is-active", String(btn.dataset.postId) === String(activePostId));
       });
     }
 
-    async function selectPost(postId, { animate = false, skipBoot = true } = {}) {
-      const post = posts.find((p) => p.id === postId);
-      if (!post || (typing && postId !== activePostId)) return;
+    async function selectPost(postId, { animate = true, skipBoot = true } = {}) {
+      const post = posts.find((p) => String(p.id) === String(postId));
+      if (!post || typing) return;
 
-      activePostId = postId;
+      activePostId = post.id;
       updateSidebarActive();
 
-      if (animate) {
+      if (!animate) {
+        renderPostInstant(post);
+        return;
+      }
+
+      typing = true;
+      listenerEl.textContent = "RX";
+      try {
         if (!skipBoot) {
           clearFeed();
           await runBoot();
@@ -529,8 +533,9 @@
           clearFeed();
         }
         await transmitPost(post);
-      } else {
-        renderPostInstant(post);
+      } finally {
+        typing = false;
+        listenerEl.textContent = "ACTIVE";
       }
     }
 
@@ -538,7 +543,6 @@
       removeCursor();
       listenerEl.textContent = "SYNC";
 
-      // Status bar + [SYS] + separator: cada um aparece inteiro, um após o outro
       const statusBar = document.querySelector(".status-bar");
       if (statusBar) {
         statusBar.classList.add("is-visible");
@@ -551,7 +555,6 @@
       }
 
       listenerEl.textContent = "ACTIVE";
-      bootComplete = true;
     }
 
     async function processQueue() {
@@ -559,16 +562,18 @@
       typing = true;
       listenerEl.textContent = "RX";
 
-      while (queue.length > 0) {
-        const post = queue.shift();
-        activePostId = post.id;
-        updateSidebarActive();
-        clearFeed();
-        await transmitPost(post);
+      try {
+        while (queue.length > 0) {
+          const post = queue.shift();
+          activePostId = post.id;
+          updateSidebarActive();
+          clearFeed();
+          await transmitPost(post);
+        }
+      } finally {
+        typing = false;
+        listenerEl.textContent = "ACTIVE";
       }
-
-      typing = false;
-      listenerEl.textContent = "ACTIVE";
     }
 
     function enqueuePost(post) {
@@ -597,20 +602,26 @@
       posts = await loadPosts();
       if (posts.length === 0) return;
 
-      // Marca todos como conhecidos ANTES de qualquer transmissão
       knownPostIds = new Set(posts.map((post) => post.id));
 
       const latest = getLatestPost();
       activePostId = latest.id;
 
-      // Lateral já mostra todas as passadas (e Lost), sem digitar uma por uma
       renderSidebar();
 
       clearFeed();
       await runBoot();
-      // Só a última é transmitida (mesmo se Lost → "signal lost")
-      await transmitPost(latest);
-      startLiveListener();
+
+      typing = true;
+      listenerEl.textContent = "RX";
+      try {
+        await transmitPost(latest);
+      } finally {
+        typing = false;
+        listenerEl.textContent = "ACTIVE";
+        bootComplete = true;
+        startLiveListener();
+      }
     }
 
     boot().catch(() => {
