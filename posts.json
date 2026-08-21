@@ -22,7 +22,7 @@
         "teste teste"
       ],
       "archived": false,
-      "lost": false
+      "lost": true
     },
     {
       "id": "003",
@@ -35,7 +35,7 @@
         "Eu não perdi o juízo. Só chega um ponto em que você se acostuma e deixa fluir, deixa ir, desapega"
       ],
       "archived": false,
-      "lost": false
+      "lost": true
     },
     {
       "id": "004",
@@ -46,7 +46,7 @@
         "testetetete"
       ],
       "archived": false,
-      "lost": false
+      "lost": true
     },
     {
       "id": "005",
@@ -57,7 +57,7 @@
         "oihsoidfsodnfknzsdklzds"
       ],
       "archived": false,
-      "lost": false
+      "lost": true
     }
   ]
 }
