@@ -511,8 +511,7 @@
     async function runBoot() {
       listenerEl.textContent = "SYNC";
       for (const item of BOOT) {
-        await typeLine(item.type, item.text);
-        await delay(rand(120, 320));
+        await revealLine(item.type, item.text, rand(140, 280));
       }
       listenerEl.textContent = "ACTIVE";
       bootComplete = true;
