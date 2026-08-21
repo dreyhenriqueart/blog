@@ -33,6 +33,19 @@
       ],
       "archived": false,
       "lost": false
+    },
+    {
+      "id": "009",
+      "sentAt": "2026-08-21T12:55:27.872Z",
+      "origin": "S-320",
+      "callsign": "VEGA-1",
+      "lines": [
+        "Anos luz não pareceu ser tão distante assim. Parece que foi ontem, chegando na estação e vendo isso aqui pela janela.",
+        "A sensação é estranha. É como dançar no escuro, ao mesmo tempo dançar com a luz sempre que a estrutura se movimenta.",
+        "Eu não perdi o juízo. Só chega um ponto em que você se acostuma e deixa fluir, deixa ir, desapega"
+      ],
+      "archived": false,
+      "lost": false
     }
   ]
 }
