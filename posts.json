@@ -10,7 +10,8 @@
         "A sensação é estranha. É como dançar no escuro, ao mesmo tempo dançar com luz sempre que a estrutura se movimenta.",
         "Eu não perdi o juízo. Só chega um ponto em que você se acostuma e deixa fluir, deixa ir, desapega..."
       ],
-      "archived": false
+      "archived": false,
+      "lost": true
     },
     {
       "id": "007",
@@ -32,7 +33,7 @@
         "teste teste 022"
       ],
       "archived": false,
-      "lost": false
+      "lost": true
     }
   ]
 }
