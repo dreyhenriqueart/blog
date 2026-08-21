@@ -4,14 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>COMMS // ADMIN</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/cascadia-mono@5.2.3/400.css" />
   <style>
     :root {
       --bg: #f0ede6;
       --fg: #1a1916;
       --fg-dim: #5c5952;
       --fg-muted: #8a877f;
-      --cmd-size: 14px;
-      --cmd-leading: 1.2;
+      --cmd-size: 18px;
+      --cmd-leading: 1.28;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -20,16 +21,16 @@
       min-height: 100%;
       background: var(--bg);
       color: var(--fg);
-      font-family: Consolas, "Lucida Console", monospace;
+      font-family: "Cascadia Mono", Consolas, "Lucida Console", monospace;
       font-size: var(--cmd-size);
       line-height: var(--cmd-leading);
-      -webkit-font-smoothing: none;
-      -moz-osx-font-smoothing: unset;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     html.is-locked .screen { display: none; }
 
-    .screen { max-width: 640px; padding: 8px 10px 16px; }
+    .screen { max-width: 640px; padding: 12px 14px 20px; }
 
     .status-bar {
       color: var(--fg-muted);

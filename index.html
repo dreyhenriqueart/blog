@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>COMMS // VEGA-1</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/cascadia-mono@5.2.3/400.css" />
   <style>
     :root {
       --bg: #f0ede6;
@@ -11,9 +12,9 @@
       --fg-dim: #5c5952;
       --fg-muted: #8a877f;
       --cursor: #1a1916;
-      /* Proporções do CMD Windows 7 (Consolas 14 / line ~1.2) */
-      --cmd-size: 14px;
-      --cmd-leading: 1.2;
+      /* CMD Windows 11 — Cascadia Mono, escala ampliada */
+      --cmd-size: 18px;
+      --cmd-leading: 1.28;
     }
 
     * {
@@ -26,12 +27,12 @@
       height: 100%;
       background: var(--bg);
       color: var(--fg);
-      font-family: Consolas, "Lucida Console", monospace;
+      font-family: "Cascadia Mono", Consolas, "Lucida Console", monospace;
       font-size: var(--cmd-size);
       line-height: var(--cmd-leading);
       font-weight: 400;
-      -webkit-font-smoothing: none;
-      -moz-osx-font-smoothing: unset;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     body {
@@ -43,8 +44,8 @@
       min-height: 100vh;
       width: 100%;
       margin: 0;
-      padding: 8px 10px 16px;
-      gap: 1.5rem;
+      padding: 12px 14px 20px;
+      gap: 2rem;
     }
 
     .main-column {
@@ -147,8 +148,8 @@
 
     .cursor {
       display: inline-block;
-      width: 0.5em;
-      height: 1em;
+      width: 0.55em;
+      height: 1.05em;
       background: var(--cursor);
       vertical-align: text-bottom;
       margin-left: 0;
@@ -172,7 +173,7 @@
     @media (max-width: 720px) {
       .layout {
         flex-direction: column;
-        padding: 8px 8px 12px;
+        padding: 12px 12px 16px;
       }
 
       .status-bar {
