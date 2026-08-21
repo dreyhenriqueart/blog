@@ -4,6 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>COMMS // VEGA-1</title>
+  <script>
+    (function () {
+      try {
+        var key = "spacecomms-theme";
+        var saved = localStorage.getItem(key);
+        var theme =
+          saved === "light" || saved === "dark"
+            ? saved
+            : matchMedia("(prefers-color-scheme: light)").matches
+              ? "light"
+              : "dark";
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
   <style>
     @font-face {
       font-family: "Cascadia Mono";
@@ -13,11 +30,19 @@
       font-display: swap;
     }
 
-    :root {
+    :root,
+    html[data-theme="dark"] {
       --bg: #0c0c14;
       --fg: #cccccc;
       --fg-soft: #e8e8e8;
       --cursor: #cccccc;
+    }
+
+    html[data-theme="light"] {
+      --bg: #cccccc;
+      --fg: #0c0c14;
+      --fg-soft: #3a3a48;
+      --cursor: #0c0c14;
     }
 
     * {
@@ -32,7 +57,7 @@
       color: var(--fg);
       font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
       font-size: 12pt;
-      line-height: 1;
+      line-height: 1.15;
       font-weight: 400;
       -webkit-font-smoothing: none;
       -moz-osx-font-smoothing: unset;
@@ -73,6 +98,21 @@
       color: var(--fg);
     }
 
+    .cmd-btn {
+      background: none;
+      border: none;
+      color: var(--fg);
+      font: inherit;
+      line-height: inherit;
+      padding: 0;
+      cursor: pointer;
+      vertical-align: baseline;
+    }
+
+    .cmd-btn:hover {
+      color: var(--fg-soft);
+    }
+
     #feed {
       flex: 1;
       white-space: pre-wrap;
@@ -110,7 +150,7 @@
       cursor: pointer;
       font: inherit;
       color: var(--fg);
-      line-height: 1;
+      line-height: 1.15;
       white-space: nowrap;
       overflow: hidden;
     }
@@ -121,9 +161,9 @@
     }
 
     .line {
-      min-height: 1em;
+      min-height: 1.15em;
       color: var(--fg);
-      line-height: 1;
+      line-height: 1.15;
     }
 
     .line--sys,
@@ -133,12 +173,17 @@
       color: var(--fg);
     }
 
+    /* Largura do corpo = fim de "INCOMING" no header da transmissão */
+    .line--body {
+      max-width: var(--msg-wrap, 42ch);
+    }
+
     .line--sep {
       margin-top: 0;
     }
 
     .line--blank {
-      min-height: 1em;
+      min-height: 1.15em;
     }
 
     .cursor {
@@ -186,6 +231,8 @@
         COMMS TERMINAL v4.2.1 &nbsp;|&nbsp;
         <span id="clock">--</span> &nbsp;|&nbsp;
         LISTENER: <span id="listener">INIT</span>
+        &nbsp;|&nbsp;
+        <button type="button" id="theme-toggle" class="cmd-btn" aria-label="Alternar tema claro/escuro">THEME: DARK</button>
       </header>
 
       <div id="feed" aria-live="polite" aria-label="Transmissão ativa"></div>
@@ -218,6 +265,40 @@
     const archiveEl = document.getElementById("archive");
     const listenerEl = document.getElementById("listener");
     const clockEl = document.getElementById("clock");
+    const themeToggleEl = document.getElementById("theme-toggle");
+    const THEME_KEY = "spacecomms-theme";
+
+    function systemTheme() {
+      return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    }
+
+    function currentTheme() {
+      return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+    }
+
+    function applyTheme(theme, { persist = false } = {}) {
+      const next = theme === "light" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      if (themeToggleEl) themeToggleEl.textContent = `THEME: ${next.toUpperCase()}`;
+      if (persist) localStorage.setItem(THEME_KEY, next);
+    }
+
+    function initThemeControls() {
+      const saved = localStorage.getItem(THEME_KEY);
+      applyTheme(saved === "light" || saved === "dark" ? saved : systemTheme());
+
+      if (themeToggleEl) {
+        themeToggleEl.addEventListener("click", () => {
+          applyTheme(currentTheme() === "dark" ? "light" : "dark", { persist: true });
+        });
+      }
+
+      window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
+        if (!localStorage.getItem(THEME_KEY)) applyTheme(systemTheme());
+      });
+    }
+
+    initThemeControls();
 
     let posts = [];
     let activePostId = null;
@@ -466,8 +547,21 @@
       return `[${stamp}] << INCOMING // ORIGIN: ${post.origin} / CALLSIGN ${post.callsign}`;
     }
 
+    function incomingWrapPrefix(post) {
+      const sentAt = post.sentAt instanceof Date ? post.sentAt : new Date(post.sentAt);
+      return `[${formatIncomingStamp(sentAt)}] << INCOMING`;
+    }
+
+    function setMessageWrap(post) {
+      document.documentElement.style.setProperty(
+        "--msg-wrap",
+        `${incomingWrapPrefix(post).length}ch`
+      );
+    }
+
     /** Bloco inteiro linha a linha (sem digitar). Usado no boot, lateral e signal lost. */
     async function revealPost(post) {
+      setMessageWrap(post);
       await delay(rand(120, 240));
 
       await revealLine("meta", buildIncomingHeader(post), rand(160, 280));
@@ -492,6 +586,7 @@
         return;
       }
 
+      setMessageWrap(post);
       await delay(rand(180, 360));
 
       // INCOMING pisca 5s — sinal de recepção
