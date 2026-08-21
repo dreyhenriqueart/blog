@@ -11,8 +11,6 @@
       --fg: #1a1916;
       --fg-dim: #5c5952;
       --fg-muted: #8a877f;
-      --cmd-size: 18px;
-      --cmd-leading: 1.28;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -22,21 +20,21 @@
       background: var(--bg);
       color: var(--fg);
       font-family: "Cascadia Mono", Consolas, "Lucida Console", monospace;
-      font-size: var(--cmd-size);
-      line-height: var(--cmd-leading);
+      font-size: 15px;
+      line-height: 1.55;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
 
     html.is-locked .screen { display: none; }
 
-    .screen { max-width: 640px; padding: 12px 14px 20px; }
+    .screen { max-width: 640px; padding: 1rem 16px 2rem; }
 
     .status-bar {
       color: var(--fg-muted);
-      font-size: var(--cmd-size);
-      letter-spacing: 0;
-      margin-bottom: 1.5em;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      margin-bottom: 1.5rem;
       user-select: none;
     }
 

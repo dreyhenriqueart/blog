@@ -12,9 +12,6 @@
       --fg-dim: #5c5952;
       --fg-muted: #8a877f;
       --cursor: #1a1916;
-      /* CMD Windows 11 — Cascadia Mono, escala ampliada */
-      --cmd-size: 18px;
-      --cmd-leading: 1.28;
     }
 
     * {
@@ -28,9 +25,8 @@
       background: var(--bg);
       color: var(--fg);
       font-family: "Cascadia Mono", Consolas, "Lucida Console", monospace;
-      font-size: var(--cmd-size);
-      line-height: var(--cmd-leading);
-      font-weight: 400;
+      font-size: 15px;
+      line-height: 1.55;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
@@ -44,8 +40,8 @@
       min-height: 100vh;
       width: 100%;
       margin: 0;
-      padding: 12px 14px 20px;
-      gap: 2rem;
+      padding: 1rem 16px 2rem;
+      gap: 1.25rem;
     }
 
     .main-column {
@@ -57,13 +53,11 @@
 
     .status-bar {
       color: var(--fg-muted);
-      font-size: var(--cmd-size);
-      letter-spacing: 0;
-      margin-bottom: 1.2em;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      margin-bottom: 1.25rem;
       user-select: none;
       flex-shrink: 0;
-      white-space: nowrap;
-      overflow: hidden;
     }
 
     .status-bar span {
@@ -83,9 +77,9 @@
 
     .sidebar-title {
       color: var(--fg-muted);
-      font-size: var(--cmd-size);
-      letter-spacing: 0;
-      margin-bottom: 0.6em;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.75rem;
       user-select: none;
       white-space: nowrap;
     }
@@ -106,9 +100,9 @@
       padding: 0;
       cursor: pointer;
       font: inherit;
-      font-size: var(--cmd-size);
+      font-size: 13px;
       color: var(--fg-dim);
-      line-height: var(--cmd-leading);
+      line-height: 1.55;
       white-space: nowrap;
       overflow: hidden;
     }
@@ -122,7 +116,7 @@
     }
 
     .line {
-      min-height: calc(var(--cmd-size) * var(--cmd-leading));
+      min-height: 1.55em;
     }
 
     .line--sys {
@@ -139,20 +133,20 @@
 
     .line--sep {
       color: var(--fg);
-      margin-top: 1.2em;
+      margin-top: 1rem;
     }
 
     .line--blank {
-      min-height: calc(var(--cmd-size) * var(--cmd-leading));
+      min-height: 1.55em;
     }
 
     .cursor {
       display: inline-block;
-      width: 0.55em;
+      width: 0.58em;
       height: 1.05em;
       background: var(--cursor);
       vertical-align: text-bottom;
-      margin-left: 0;
+      margin-left: 1px;
       animation: blink 1s step-end infinite;
     }
 
@@ -173,17 +167,13 @@
     @media (max-width: 720px) {
       .layout {
         flex-direction: column;
-        padding: 12px 12px 16px;
-      }
-
-      .status-bar {
-        white-space: normal;
+        padding: 1rem 10px 1.5rem;
       }
 
       .sidebar {
         width: 100%;
         min-width: 0;
-        padding-top: 1.2em;
+        padding-top: 1.25rem;
       }
     }
   </style>
