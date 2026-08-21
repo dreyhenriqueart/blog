@@ -588,24 +588,37 @@
       setInterval(updateClock, 1000);
       listenerEl.textContent = "SYNC";
 
-      posts = await loadPosts();
-      if (posts.length === 0) {
-        listenerEl.textContent = "IDLE";
-        createLine("sys", "[SYS] no transmissions on uplink");
+      let loaded = [];
+      try {
+        loaded = await loadPosts();
+      } catch (err) {
+        listenerEl.textContent = "ERR";
+        await runBoot();
+        createLine("sys", "[SYS] failed to load transmissions");
         bootComplete = true;
         startLiveListener();
         return;
       }
 
+      posts = loaded;
       knownPostIds = new Set(posts.map((post) => post.id));
-
-      const latest = getLatestPost();
-      activePostId = latest.id;
-
       renderSidebar();
 
       clearFeed();
       await runBoot();
+
+      if (posts.length === 0) {
+        listenerEl.textContent = "IDLE";
+        createLine("sys", "[SYS] no transmissions on uplink");
+        createLine("sep", SEPARATOR);
+        bootComplete = true;
+        startLiveListener();
+        return;
+      }
+
+      const latest = getLatestPost();
+      activePostId = latest.id;
+      updateSidebarActive();
 
       typing = true;
       listenerEl.textContent = "RX";
@@ -621,10 +634,9 @@
 
     boot().catch(() => {
       listenerEl.textContent = "ERR";
-      const msg = isPreview
+      createLine("sys", isPreview
         ? "[SYS] preview unavailable — compose again in admin"
-        : "[SYS] failed to load transmissions";
-      createLine("sys", msg);
+        : "[SYS] failed to load transmissions");
       bootComplete = true;
     });
   </script>
