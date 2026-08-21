@@ -59,11 +59,6 @@
       margin-bottom: 1.25rem;
       user-select: none;
       flex-shrink: 0;
-      visibility: hidden;
-    }
-
-    .status-bar.is-visible {
-      visibility: visible;
     }
 
     .status-bar span {
@@ -251,7 +246,8 @@
           .sort((a, b) => a.sentAt - b.sentAt);
       }
 
-      const published = await SpaceCommsStore.fetchPublishedPosts();
+      // preferLive: snapshot local primeiro (instantâneo após admin)
+      const published = await SpaceCommsStore.fetchPublishedPosts({ preferLive: true });
       return published.map(parsePost);
     }
 
@@ -450,8 +446,6 @@
 
     function renderPostInstant(post) {
       clearFeed();
-      const statusBar = document.querySelector(".status-bar");
-      if (statusBar) statusBar.classList.add("is-visible");
       createLine("meta", buildIncomingHeader(post));
       createLine("blank");
       createLine("blank");
@@ -466,22 +460,22 @@
     }
 
     async function transmitPost(post) {
-      await delay(rand(400, 900));
+      await delay(rand(180, 360));
 
       // INCOMING / blanks / END: linha inteira. Só o corpo digita com cursor.
-      await revealLine("meta", buildIncomingHeader(post));
-      await revealLine("blank", "", rand(180, 320));
-      await revealLine("blank", "", rand(180, 320));
-      await delay(rand(200, 360));
+      await revealLine("meta", buildIncomingHeader(post), rand(160, 280));
+      await revealLine("blank", "", rand(80, 140));
+      await revealLine("blank", "", rand(80, 140));
+      await delay(rand(100, 200));
 
       let lastBodyLine = null;
       for (const line of displayLines(post)) {
         lastBodyLine = await typeLine("body", String(line));
-        await delay(rand(180, 420));
+        await delay(rand(120, 280));
       }
 
-      await revealLine("blank", "", rand(180, 320));
-      await revealLine("meta", buildTransmissionEnd(new Date()));
+      await revealLine("blank", "", rand(80, 140));
+      await revealLine("meta", buildTransmissionEnd(new Date()), rand(160, 280));
       createLine("sep", SEPARATOR);
       if (lastBodyLine) attachCursor(lastBodyLine);
     }
@@ -543,15 +537,9 @@
       removeCursor();
       listenerEl.textContent = "SYNC";
 
-      const statusBar = document.querySelector(".status-bar");
-      if (statusBar) {
-        statusBar.classList.add("is-visible");
-        await delay(rand(480, 720));
-      }
-
       for (const item of BOOT) {
         createLine(item.type, item.text);
-        await delay(rand(480, 720));
+        await delay(rand(220, 380));
       }
 
       listenerEl.textContent = "ACTIVE";
@@ -598,9 +586,16 @@
     async function boot() {
       updateClock();
       setInterval(updateClock, 1000);
+      listenerEl.textContent = "SYNC";
 
       posts = await loadPosts();
-      if (posts.length === 0) return;
+      if (posts.length === 0) {
+        listenerEl.textContent = "IDLE";
+        createLine("sys", "[SYS] no transmissions on uplink");
+        bootComplete = true;
+        startLiveListener();
+        return;
+      }
 
       knownPostIds = new Set(posts.map((post) => post.id));
 
@@ -630,6 +625,7 @@
         ? "[SYS] preview unavailable — compose again in admin"
         : "[SYS] failed to load transmissions";
       createLine("sys", msg);
+      bootComplete = true;
     });
   </script>
 </body>

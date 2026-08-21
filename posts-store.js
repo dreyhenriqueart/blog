@@ -62,16 +62,14 @@
   }
 
   function postsUrl() {
-    if (isLocalHost()) {
-      return `posts.json?t=${Date.now()}`;
-    }
-    return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${GH_PATH}?t=${Date.now()}`;
+    // Mesma origem (Pages/local) — bem mais rápido que raw.githubusercontent CDN
+    return `posts.json?t=${Date.now()}`;
   }
 
   async function fetchAllPosts(options = {}) {
     const fresh = Boolean(options.fresh);
 
-    // Admin: lê direto da API (sem cache do raw.githubusercontent)
+    // Admin: lê direto da API (sem cache do Pages/raw)
     if (fresh && !isLocalHost()) {
       const token = await ensureToken();
       const meta = await getFileMeta(token);
@@ -79,7 +77,19 @@
       return Array.isArray(data.posts) ? data.posts : [];
     }
 
-    const res = await fetch(postsUrl(), { cache: "no-store" });
+    try {
+      const res = await fetch(postsUrl(), { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data.posts) ? data.posts : [];
+      }
+    } catch {
+      // fallback abaixo
+    }
+
+    // Fallback se posts.json local falhar
+    const rawUrl = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${GH_PATH}?t=${Date.now()}`;
+    const res = await fetch(rawUrl, { cache: "no-store" });
     if (!res.ok) throw new Error("posts.json unavailable");
     const data = await res.json();
     return Array.isArray(data.posts) ? data.posts : [];
