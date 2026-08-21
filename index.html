@@ -287,7 +287,8 @@
         const activeStillExists = fresh.some((p) => String(p.id) === String(activePostId));
         if (!activeStillExists) {
           if (fresh.length === 0) {
-            clearFeed();
+            resetFeedKeepBoot();
+            createLine("sys", "[SYS] no transmissions on uplink");
             activePostId = null;
             return;
           }
@@ -393,6 +394,18 @@
       if (activeCursor) {
         activeCursor = null;
       }
+    }
+
+    /** Repõe o bloco [SYS] instantâneo (não reanima). Mantém o que já funcionava no boot. */
+    function paintBootStatic() {
+      for (const item of BOOT) {
+        createLine(item.type, item.text);
+      }
+    }
+
+    function resetFeedKeepBoot() {
+      clearFeed();
+      paintBootStatic();
     }
 
     function createLine(type, text) {
@@ -538,7 +551,7 @@
       typing = true;
       listenerEl.textContent = "RX";
       try {
-        clearFeed();
+        resetFeedKeepBoot();
         await revealPost(post);
       } finally {
         typing = false;
@@ -570,7 +583,7 @@
           const typeBody = Boolean(item.typeBody) && !post.lost;
           activePostId = post.id;
           updateSidebarActive();
-          clearFeed();
+          resetFeedKeepBoot();
           if (typeBody) await transmitPost(post);
           else await revealPost(post);
         }
