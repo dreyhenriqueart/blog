@@ -551,14 +551,14 @@
     }
 
     function incomingWrapPrefix(post) {
-      const sentAt = post.sentAt instanceof Date ? post.sentAt : new Date(post.sentAt);
-      return `[${formatIncomingStamp(sentAt)}] << INCOMING`;
+      // Limite do corpo: um pouco depois de CALLSIGN + nome
+      return buildIncomingHeader(post);
     }
 
     function setMessageWrap(post) {
       document.documentElement.style.setProperty(
         "--msg-wrap",
-        `${incomingWrapPrefix(post).length}ch`
+        `${incomingWrapPrefix(post).length + 4}ch`
       );
     }
 
