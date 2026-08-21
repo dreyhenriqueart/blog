@@ -14,10 +14,10 @@
     }
 
     :root {
-      --bg: #f0ede6;
-      --fg: #1a1916;
-      --fg-soft: #5c5952;
-      --cursor: #1a1916;
+      --bg: #0c0c14;
+      --fg: #cccccc;
+      --fg-soft: #e8e8e8;
+      --cursor: #cccccc;
     }
 
     * {
@@ -31,22 +31,26 @@
       background: var(--bg);
       color: var(--fg);
       font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
-      font-size: 15px;
-      line-height: 1.55;
-      -webkit-font-smoothing: antialiased;
+      font-size: 12pt;
+      line-height: 1;
+      font-weight: 400;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: unset;
+      text-rendering: geometricPrecision;
     }
 
     body {
       min-height: 100vh;
     }
 
+    /* Windows Terminal default padding: 8, 8, 8, 8 */
     .layout {
       display: flex;
       min-height: 100vh;
       width: 100%;
       margin: 0;
-      padding: 1rem 16px 2rem;
-      gap: 1.25rem;
+      padding: 8px;
+      gap: 2ch;
     }
 
     .main-column {
@@ -58,9 +62,9 @@
 
     .status-bar {
       color: var(--fg);
-      font-size: 13px;
-      letter-spacing: 0.04em;
-      margin-bottom: 1.25rem;
+      font: inherit;
+      letter-spacing: normal;
+      margin-bottom: 1em;
       user-select: none;
       flex-shrink: 0;
     }
@@ -82,9 +86,9 @@
 
     .sidebar-title {
       color: var(--fg);
-      font-size: 12px;
-      letter-spacing: 0.04em;
-      margin-bottom: 0.75rem;
+      font: inherit;
+      letter-spacing: normal;
+      margin-bottom: 1em;
       user-select: none;
       white-space: nowrap;
     }
@@ -105,9 +109,8 @@
       padding: 0;
       cursor: pointer;
       font: inherit;
-      font-size: 13px;
       color: var(--fg);
-      line-height: 1.55;
+      line-height: 1;
       white-space: nowrap;
       overflow: hidden;
     }
@@ -118,8 +121,9 @@
     }
 
     .line {
-      min-height: 1.55em;
+      min-height: 1em;
       color: var(--fg);
+      line-height: 1;
     }
 
     .line--sys,
@@ -130,20 +134,20 @@
     }
 
     .line--sep {
-      margin-top: 1rem;
+      margin-top: 0;
     }
 
     .line--blank {
-      min-height: 1.55em;
+      min-height: 1em;
     }
 
     .cursor {
       display: inline-block;
-      width: 0.58em;
-      height: 1.05em;
+      width: 0.6em;
+      height: 1em;
       background: var(--cursor);
       vertical-align: text-bottom;
-      margin-left: 1px;
+      margin-left: 0;
       animation: blink 1s step-end infinite;
     }
 
@@ -164,13 +168,13 @@
     @media (max-width: 720px) {
       .layout {
         flex-direction: column;
-        padding: 1rem 10px 1.5rem;
+        padding: 8px;
       }
 
       .sidebar {
         width: 100%;
         min-width: 0;
-        padding-top: 1.25rem;
+        padding-top: 1em;
       }
     }
   </style>

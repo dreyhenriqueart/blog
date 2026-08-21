@@ -14,9 +14,9 @@
     }
 
     :root {
-      --bg: #f0ede6;
-      --fg: #1a1916;
-      --fg-soft: #5c5952;
+      --bg: #0c0c14;
+      --fg: #cccccc;
+      --fg-soft: #e8e8e8;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,19 +26,20 @@
       background: var(--bg);
       color: var(--fg);
       font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
-      font-size: 15px;
-      line-height: 1.55;
-      -webkit-font-smoothing: antialiased;
+      font-size: 12pt;
+      line-height: 1;
+      -webkit-font-smoothing: none;
+      text-rendering: geometricPrecision;
     }
 
     html.is-locked .screen { display: none; }
 
-    .screen { max-width: 640px; padding: 1rem 16px 2rem; }
+    .screen { max-width: 640px; padding: 8px; }
 
     .status-bar {
       color: var(--fg);
-      font-size: 13px;
-      letter-spacing: 0.04em;
+      font-size: inherit;
+      letter-spacing: normal;
       margin-bottom: 1.5rem;
       user-select: none;
     }
@@ -50,7 +51,7 @@
     label {
       display: block;
       color: var(--fg);
-      font-size: 13px;
+      font-size: inherit;
       margin-bottom: 0.35rem;
     }
 
@@ -62,7 +63,7 @@
       border: none;
       border-bottom: 1px solid var(--fg);
       font: inherit;
-      line-height: 1.55;
+      line-height: 1;
       padding: 0.25rem 0;
       margin-bottom: 1.25rem;
       outline: none;
@@ -109,7 +110,7 @@
     button:hover { color: var(--fg-soft); }
     button:disabled { color: var(--fg-soft); cursor: wait; }
 
-    .hint { color: var(--fg); font-size: 12px; margin-top: 1rem; }
+    .hint { color: var(--fg); font-size: inherit; margin-top: 1rem; }
 
     .status-msg { margin-top: 0.75rem; display: none; }
     .status-msg.is-visible { display: block; }
@@ -118,7 +119,7 @@
 
     .auth-gate {
       max-width: 640px;
-      padding: 1rem 16px 2rem;
+      padding: 8px;
     }
   </style>
 </head>
