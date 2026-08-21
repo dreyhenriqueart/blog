@@ -4,13 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>COMMS // ADMIN</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/cascadia-mono@5.2.3/400.css" />
   <style>
+    @font-face {
+      font-family: "Cascadia Mono";
+      src: url("https://cdn.jsdelivr.net/gh/microsoft/cascadia-code@v2404.23/ttf/static/CascadiaMono-Regular.ttf") format("truetype");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
     :root {
       --bg: #f0ede6;
       --fg: #1a1916;
-      --fg-dim: #5c5952;
-      --fg-muted: #8a877f;
+      --fg-soft: #5c5952;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -19,11 +25,10 @@
       min-height: 100%;
       background: var(--bg);
       color: var(--fg);
-      font-family: "Cascadia Mono", Consolas, "Lucida Console", monospace;
+      font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
       font-size: 15px;
       line-height: 1.55;
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
     }
 
     html.is-locked .screen { display: none; }
@@ -31,20 +36,20 @@
     .screen { max-width: 640px; padding: 1rem 16px 2rem; }
 
     .status-bar {
-      color: var(--fg-muted);
+      color: var(--fg);
       font-size: 13px;
       letter-spacing: 0.04em;
       margin-bottom: 1.5rem;
       user-select: none;
     }
 
-    .status-bar span { color: var(--fg-dim); }
+    .status-bar span { color: var(--fg); }
 
-    .sys-line { color: var(--fg-dim); margin-bottom: 0.5rem; }
+    .sys-line { color: var(--fg); margin-bottom: 0.5rem; }
 
     label {
       display: block;
-      color: var(--fg-muted);
+      color: var(--fg);
       font-size: 13px;
       margin-bottom: 0.35rem;
     }
@@ -55,7 +60,7 @@
       background: var(--bg);
       color: var(--fg);
       border: none;
-      border-bottom: 1px solid var(--fg-muted);
+      border-bottom: 1px solid var(--fg);
       font: inherit;
       line-height: 1.55;
       padding: 0.25rem 0;
@@ -84,12 +89,12 @@
       display: inline-block;
       margin-top: 1.5rem;
       margin-right: 1.25rem;
-      color: var(--fg-dim);
+      color: var(--fg);
       text-decoration: none;
       font: inherit;
     }
 
-    .nav-link:hover { color: var(--fg); }
+    .nav-link:hover { color: var(--fg-soft); }
 
     button {
       background: none;
@@ -101,15 +106,15 @@
       text-align: left;
     }
 
-    button:hover { color: var(--fg-dim); }
-    button:disabled { color: var(--fg-muted); cursor: wait; }
+    button:hover { color: var(--fg-soft); }
+    button:disabled { color: var(--fg-soft); cursor: wait; }
 
-    .hint { color: var(--fg-muted); font-size: 12px; margin-top: 1rem; }
+    .hint { color: var(--fg); font-size: 12px; margin-top: 1rem; }
 
     .status-msg { margin-top: 0.75rem; display: none; }
     .status-msg.is-visible { display: block; }
     .error { color: var(--fg); }
-    .success { color: var(--fg-dim); }
+    .success { color: var(--fg); }
 
     .auth-gate {
       max-width: 640px;
@@ -135,7 +140,7 @@
       <input id="callsign" name="callsign" type="text" value="VEGA-1" autocomplete="off" required />
 
       <label for="message">TRANSMISSION BODY</label>
-      <textarea id="message" name="message" placeholder="Uma linha por parágrafo." required></textarea>
+      <textarea id="message" name="message" placeholder="Uma linha por parÃ¡grafo." required></textarea>
 
       <div class="actions">
         <button type="submit" id="preview-btn">COMMS&gt; preview_</button>
@@ -225,7 +230,7 @@
       const lines = parseLines(message);
 
       if (!origin || !callsign || lines.length === 0) {
-        showError("[ERR] ORIGIN, CALLSIGN e corpo da transmissão são obrigatórios.");
+        showError("[ERR] ORIGIN, CALLSIGN e corpo da transmissÃ£o sÃ£o obrigatÃ³rios.");
         return null;
       }
 

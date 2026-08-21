@@ -4,13 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>COMMS // ADMIN DELETED</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/cascadia-mono@5.2.3/400.css" />
   <style>
+    @font-face {
+      font-family: "Cascadia Mono";
+      src: url("https://cdn.jsdelivr.net/gh/microsoft/cascadia-code@v2404.23/ttf/static/CascadiaMono-Regular.ttf") format("truetype");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
     :root {
       --bg: #f0ede6;
       --fg: #1a1916;
-      --fg-dim: #5c5952;
-      --fg-muted: #8a877f;
+      --fg-soft: #5c5952;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -19,29 +25,28 @@
       min-height: 100%;
       background: var(--bg);
       color: var(--fg);
-      font-family: "Cascadia Mono", Consolas, "Lucida Console", monospace;
+      font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
       font-size: 15px;
       line-height: 1.55;
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
     }
 
     html.is-locked .screen { display: none; }
     .screen { max-width: 720px; padding: 1rem 16px 2rem; }
 
     .status-bar {
-      color: var(--fg-muted);
+      color: var(--fg);
       font-size: 13px;
       letter-spacing: 0.04em;
       margin-bottom: 1.5rem;
       user-select: none;
     }
-    .status-bar span { color: var(--fg-dim); }
-    .sys-line { color: var(--fg-dim); margin-bottom: 0.5rem; }
+    .status-bar span { color: var(--fg); }
+    .sys-line { color: var(--fg); margin-bottom: 0.5rem; }
 
     label {
       display: block;
-      color: var(--fg-muted);
+      color: var(--fg);
       font-size: 13px;
       margin-bottom: 0.35rem;
     }
@@ -52,7 +57,7 @@
       background: var(--bg);
       color: var(--fg);
       border: none;
-      border-bottom: 1px solid var(--fg-muted);
+      border-bottom: 1px solid var(--fg);
       font: inherit;
       line-height: 1.55;
       padding: 0.25rem 0;
@@ -66,14 +71,14 @@
       display: inline-block;
       margin-top: 1rem;
       margin-right: 1.25rem;
-      color: var(--fg-dim);
+      color: var(--fg);
       text-decoration: none;
       font: inherit;
     }
-    .nav-link:hover { color: var(--fg); }
+    .nav-link:hover { color: var(--fg-soft); }
 
     .manage-title {
-      color: var(--fg-muted);
+      color: var(--fg);
       font-size: 12px;
       letter-spacing: 0.04em;
       margin: 1.5rem 0 0.75rem;
@@ -101,7 +106,7 @@
       border: none;
       font: inherit;
       font-size: 13px;
-      color: var(--fg-dim);
+      color: var(--fg);
       cursor: pointer;
       padding: 0;
       text-align: left;
@@ -109,7 +114,7 @@
       overflow: hidden;
     }
     .post-row__name:hover,
-    .post-row__name.is-open { color: var(--fg); }
+    .post-row__name.is-open { color: var(--fg-soft); }
 
     .post-preview {
       display: none;
@@ -121,7 +126,7 @@
     .post-preview.is-open { display: block; }
 
     .manage-empty {
-      color: var(--fg-muted);
+      color: var(--fg);
       font-size: 13px;
       margin-bottom: 1rem;
     }
@@ -142,13 +147,13 @@
       padding: 0;
       text-align: left;
     }
-    button:hover { color: var(--fg-dim); }
-    button:disabled { color: var(--fg-muted); cursor: wait; }
+    button:hover { color: var(--fg-soft); }
+    button:disabled { color: var(--fg-soft); cursor: wait; }
 
     .status-msg { margin-top: 0.75rem; display: none; }
     .status-msg.is-visible { display: block; }
     .error { color: var(--fg); }
-    .success { color: var(--fg-dim); }
+    .success { color: var(--fg); }
 
     .auth-gate { max-width: 720px; padding: 1rem 16px 2rem; }
   </style>
@@ -263,7 +268,7 @@
         posts = await SpaceCommsStore.fetchAllPosts({ fresh: true });
         posts = posts.filter((post) => post.lost);
       } catch {
-        showError("[ERR] não foi possível carregar deletados.");
+        showError("[ERR] nÃ£o foi possÃ­vel carregar deletados.");
         manageEmptyEl.hidden = true;
         return;
       }
@@ -313,7 +318,7 @@
       purgeBtn.addEventListener("click", async () => {
         const ids = getSelectedPostIds();
         if (ids.length === 0) {
-          showError("[ERR] selecione ao menos uma transmissão.");
+          showError("[ERR] selecione ao menos uma transmissÃ£o.");
           return;
         }
 
@@ -321,7 +326,7 @@
         try {
           const result = await SpaceCommsStore.purgePosts(ids);
           if (!result.purged) {
-            showError("[ERR] nenhuma transmissão removida.");
+            showError("[ERR] nenhuma transmissÃ£o removida.");
           } else {
             showSuccess(`[SYS] purged permanently // ${result.purged}`);
           }

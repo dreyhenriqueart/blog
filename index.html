@@ -4,13 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>COMMS // VEGA-1</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/cascadia-mono@5.2.3/400.css" />
   <style>
+    @font-face {
+      font-family: "Cascadia Mono";
+      src: url("https://cdn.jsdelivr.net/gh/microsoft/cascadia-code@v2404.23/ttf/static/CascadiaMono-Regular.ttf") format("truetype");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
     :root {
       --bg: #f0ede6;
       --fg: #1a1916;
-      --fg-dim: #5c5952;
-      --fg-muted: #8a877f;
+      --fg-soft: #5c5952;
       --cursor: #1a1916;
     }
 
@@ -24,11 +30,10 @@
       height: 100%;
       background: var(--bg);
       color: var(--fg);
-      font-family: "Cascadia Mono", Consolas, "Lucida Console", monospace;
+      font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
       font-size: 15px;
       line-height: 1.55;
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
     }
 
     body {
@@ -52,7 +57,7 @@
     }
 
     .status-bar {
-      color: var(--fg-muted);
+      color: var(--fg);
       font-size: 13px;
       letter-spacing: 0.04em;
       margin-bottom: 1.25rem;
@@ -61,7 +66,7 @@
     }
 
     .status-bar span {
-      color: var(--fg-dim);
+      color: var(--fg);
     }
 
     #feed {
@@ -76,7 +81,7 @@
     }
 
     .sidebar-title {
-      color: var(--fg-muted);
+      color: var(--fg);
       font-size: 12px;
       letter-spacing: 0.04em;
       margin-bottom: 0.75rem;
@@ -101,38 +106,30 @@
       cursor: pointer;
       font: inherit;
       font-size: 13px;
-      color: var(--fg-dim);
+      color: var(--fg);
       line-height: 1.55;
       white-space: nowrap;
       overflow: hidden;
     }
 
-    .archive-item:hover {
-      color: var(--fg);
-    }
-
+    .archive-item:hover,
     .archive-item.is-active {
-      color: var(--fg);
+      color: var(--fg-soft);
     }
 
     .line {
       min-height: 1.55em;
-    }
-
-    .line--sys {
-      color: var(--fg-dim);
-    }
-
-    .line--meta {
       color: var(--fg);
     }
 
-    .line--body {
+    .line--sys,
+    .line--meta,
+    .line--body,
+    .line--sep {
       color: var(--fg);
     }
 
     .line--sep {
-      color: var(--fg);
       margin-top: 1rem;
     }
 
