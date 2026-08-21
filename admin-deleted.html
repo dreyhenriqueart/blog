@@ -82,31 +82,42 @@
 
     #post-list { list-style: none; margin-bottom: 1rem; }
 
+    .post-item { margin-bottom: 0.15rem; }
+
     .post-row {
-      display: block;
-      width: 100%;
-      text-align: left;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      line-height: 1.55;
+    }
+
+    .post-row input[type="checkbox"] {
+      width: auto;
+      margin: 0.2rem 0 0;
+      accent-color: var(--fg);
+    }
+
+    .post-row__name {
       background: none;
       border: none;
       font: inherit;
-      color: var(--fg-dim);
       font-size: 13px;
-      line-height: 1.55;
-      padding: 0;
+      color: var(--fg-dim);
       cursor: pointer;
+      padding: 0;
+      text-align: left;
       white-space: nowrap;
       overflow: hidden;
     }
-    .post-row:hover,
-    .post-row.is-open { color: var(--fg); }
+    .post-row__name:hover,
+    .post-row__name.is-open { color: var(--fg); }
 
     .post-preview {
       display: none;
       color: var(--fg);
       font-size: 13px;
       white-space: pre-wrap;
-      margin: 0.35rem 0 0.85rem;
-      padding-left: 0;
+      margin: 0.25rem 0 0.75rem 1.35rem;
     }
     .post-preview.is-open { display: block; }
 
@@ -116,9 +127,12 @@
       margin-bottom: 1rem;
     }
 
-    .status-msg { margin-top: 0.75rem; display: none; }
-    .status-msg.is-visible { display: block; }
-    .error { color: var(--fg); }
+    .actions {
+      margin-top: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
 
     button {
       background: none;
@@ -130,6 +144,12 @@
       text-align: left;
     }
     button:hover { color: var(--fg-dim); }
+    button:disabled { color: var(--fg-muted); cursor: wait; }
+
+    .status-msg { margin-top: 0.75rem; display: none; }
+    .status-msg.is-visible { display: block; }
+    .error { color: var(--fg); }
+    .success { color: var(--fg-dim); }
 
     .auth-gate { max-width: 720px; padding: 1rem 16px 2rem; }
   </style>
@@ -144,11 +164,18 @@
 
     <p class="sys-line">[SYS] lost transmissions registry</p>
     <p class="sys-line">[SYS] click a name to read original text</p>
+    <p class="sys-line">[SYS] purge removes the post completely from the blog</p>
 
     <div class="manage-title">Deleted</div>
     <ul id="post-list"></ul>
     <p id="manage-empty" class="manage-empty" hidden>[SYS] no deleted transmissions</p>
+
+    <div class="actions">
+      <button type="button" id="purge-btn">COMMS&gt; purge selected_</button>
+    </div>
+
     <p id="status-error" class="status-msg error" role="alert"></p>
+    <p id="status-success" class="status-msg success" role="status"></p>
 
     <a class="nav-link" href="admin-edit.html">COMMS&gt; edit_</a>
     <a class="nav-link" href="admin.html">COMMS&gt; compose_</a>
@@ -163,7 +190,9 @@
     const clockEl = document.getElementById("clock");
     const postListEl = document.getElementById("post-list");
     const manageEmptyEl = document.getElementById("manage-empty");
+    const purgeBtn = document.getElementById("purge-btn");
     const errorEl = document.getElementById("status-error");
+    const successEl = document.getElementById("status-success");
 
     function doYear(date) { return date.getFullYear() - DO_EPOCH; }
 
@@ -194,8 +223,24 @@
     }
 
     function showError(message) {
+      successEl.classList.remove("is-visible");
       errorEl.textContent = message;
       errorEl.classList.add("is-visible");
+    }
+
+    function showSuccess(message) {
+      errorEl.classList.remove("is-visible");
+      successEl.textContent = message;
+      successEl.classList.add("is-visible");
+    }
+
+    function clearStatus() {
+      errorEl.classList.remove("is-visible");
+      successEl.classList.remove("is-visible");
+    }
+
+    function setBusy(isBusy) {
+      purgeBtn.disabled = isBusy;
     }
 
     function formatPostLabel(post) {
@@ -204,8 +249,14 @@
       return `${date} ${text}`;
     }
 
+    function getSelectedPostIds() {
+      return [...postListEl.querySelectorAll('input[type="checkbox"]:checked')].map(
+        (input) => input.value
+      );
+    }
+
     async function renderPostList() {
-      errorEl.classList.remove("is-visible");
+      clearStatus();
       postListEl.innerHTML = "";
 
       let posts = [];
@@ -228,25 +279,62 @@
 
       for (const post of posts) {
         const li = document.createElement("li");
+        li.className = "post-item";
 
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "post-row";
-        btn.textContent = formatPostLabel(post);
+        const row = document.createElement("div");
+        row.className = "post-row";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = post.id;
+
+        const nameBtn = document.createElement("button");
+        nameBtn.type = "button";
+        nameBtn.className = "post-row__name";
+        nameBtn.textContent = formatPostLabel(post);
 
         const preview = document.createElement("div");
         preview.className = "post-preview";
         preview.textContent = post.lines.join("\n");
 
-        btn.addEventListener("click", () => {
+        nameBtn.addEventListener("click", () => {
           const open = preview.classList.toggle("is-open");
-          btn.classList.toggle("is-open", open);
+          nameBtn.classList.toggle("is-open", open);
         });
 
-        li.appendChild(btn);
+        row.appendChild(checkbox);
+        row.appendChild(nameBtn);
+        li.appendChild(row);
         li.appendChild(preview);
         postListEl.appendChild(li);
       }
+    }
+
+    function bindDeleted() {
+      purgeBtn.addEventListener("click", async () => {
+        const ids = getSelectedPostIds();
+        if (ids.length === 0) {
+          showError("[ERR] selecione ao menos uma transmissão.");
+          return;
+        }
+
+        setBusy(true);
+        try {
+          const result = await SpaceCommsStore.purgePosts(ids);
+          if (!result.purged) {
+            showError("[ERR] nenhuma transmissão removida.");
+          } else {
+            showSuccess(`[SYS] purged permanently // ${result.purged}`);
+          }
+          await renderPostList();
+        } catch (err) {
+          showError(`[ERR] ${err.message}`);
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      renderPostList();
     }
 
     updateClock();
@@ -254,7 +342,7 @@
 
     SpaceCommsAuth.mountGate({
       onReady() {
-        renderPostList();
+        bindDeleted();
       }
     });
   </script>

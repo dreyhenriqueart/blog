@@ -308,6 +308,39 @@
     }, `signal lost ${ids.join(",")}`);
   }
 
+  async function purgePosts(ids) {
+    if (isLocalHost()) {
+      const res = await fetch("api/posts/purge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const result = await res.json();
+      await notifyAfterLocalMutate();
+      return result;
+    }
+
+    return mutateRemote((posts) => {
+      const idSet = new Set(ids.map(String));
+      const kept = [];
+      let purged = 0;
+      for (const post of posts) {
+        if (idSet.has(String(post.id))) {
+          purged++;
+        } else {
+          kept.push(post);
+        }
+      }
+      posts.length = 0;
+      posts.push(...kept);
+      return { purged, ids };
+    }, `purge transmissions ${ids.join(",")}`);
+  }
+
   async function archivePosts(ids, archived) {
     if (isLocalHost()) {
       const res = await fetch("api/posts/archive", {
@@ -344,6 +377,7 @@
     fetchPublishedPosts,
     publishPost,
     deletePosts,
+    purgePosts,
     archivePosts,
     getToken,
     setToken,

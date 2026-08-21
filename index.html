@@ -279,6 +279,20 @@
         knownPostIds = freshIds;
         renderSidebar();
 
+        const activeStillExists = fresh.some((p) => p.id === activePostId);
+        if (!activeStillExists) {
+          if (fresh.length === 0) {
+            clearFeed();
+            activePostId = null;
+            return;
+          }
+          const latest = getLatestPost();
+          activePostId = latest.id;
+          updateSidebarActive();
+          renderPostInstant(latest);
+          return;
+        }
+
         if (activeBecameLost) {
           renderPostInstant(activeNow);
           return;
@@ -442,13 +456,14 @@
       createLine("meta", buildIncomingHeader(post));
       createLine("blank");
       createLine("blank");
+      let lastBodyLine = null;
       for (const line of displayLines(post)) {
-        createLine("body", line);
+        lastBodyLine = createLine("body", line);
       }
       createLine("blank");
-      const endLine = createLine("meta", buildTransmissionEnd(new Date()));
+      createLine("meta", buildTransmissionEnd(new Date()));
       createLine("sep", SEPARATOR);
-      attachCursor(endLine);
+      if (lastBodyLine) attachCursor(lastBodyLine);
     }
 
     async function transmitPost(post) {
@@ -461,16 +476,17 @@
       await revealLine("blank", "", rand(180, 320));
       await delay(rand(200, 360));
 
+      let lastBodyLine = null;
       for (const line of displayLines(post)) {
-        await typeLine("body", line);
+        lastBodyLine = await typeLine("body", line);
         await delay(rand(180, 420));
       }
 
       removeCursor();
       await revealLine("blank", "", rand(180, 320));
-      const endLine = await revealLine("meta", buildTransmissionEnd(new Date()));
+      await revealLine("meta", buildTransmissionEnd(new Date()));
       createLine("sep", SEPARATOR);
-      attachCursor(endLine);
+      if (lastBodyLine) attachCursor(lastBodyLine);
     }
 
     function renderSidebar() {

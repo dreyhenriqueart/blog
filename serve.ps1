@@ -105,6 +105,48 @@ function Remove-Posts($ids) {
   }
 }
 
+function Purge-Posts($ids) {
+  if (-not (Test-Path $PostsFile -PathType Leaf)) {
+    throw "posts.json not found"
+  }
+
+  $targetIds = @($ids | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+  if ($targetIds.Count -eq 0) {
+    throw "ids are required"
+  }
+
+  $raw = [System.IO.File]::ReadAllText($PostsFile, [System.Text.Encoding]::UTF8)
+  $data = $raw | ConvertFrom-Json
+
+  if (-not $data.posts) {
+    throw "no posts to purge"
+  }
+
+  $kept = @()
+  $purged = 0
+  foreach ($post in @($data.posts)) {
+    if ($targetIds -contains [string]$post.id) {
+      $purged++
+    }
+    else {
+      $kept += $post
+    }
+  }
+
+  if ($purged -eq 0) {
+    throw "posts not found"
+  }
+
+  $data.posts = $kept
+  $json = $data | ConvertTo-Json -Depth 10
+  [System.IO.File]::WriteAllText($PostsFile, $json, [System.Text.Encoding]::UTF8)
+
+  return @{
+    purged = $purged
+    ids    = $targetIds
+  }
+}
+
 function Set-PostsArchived($ids, $archived) {
   if (-not (Test-Path $PostsFile -PathType Leaf)) {
     throw "posts.json not found"
@@ -203,6 +245,21 @@ while ($listener.IsListening) {
       else {
         $payload = $body | ConvertFrom-Json
         $result = Remove-Posts @($payload.ids)
+        $out = ($result | ConvertTo-Json -Depth 10 -Compress)
+        Send-Response $response 200 $out "application/json; charset=utf-8"
+      }
+    }
+    elseif ($request.HttpMethod -eq "POST" -and $path -eq "api/posts/purge") {
+      $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+      $body = $reader.ReadToEnd()
+      $reader.Close()
+
+      if ([string]::IsNullOrWhiteSpace($body)) {
+        Send-Response $response 400 '{"error":"empty body"}' "application/json; charset=utf-8"
+      }
+      else {
+        $payload = $body | ConvertFrom-Json
+        $result = Purge-Posts @($payload.ids)
         $out = ($result | ConvertTo-Json -Depth 10 -Compress)
         Send-Response $response 200 $out "application/json; charset=utf-8"
       }
