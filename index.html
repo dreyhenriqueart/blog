@@ -59,6 +59,11 @@
       margin-bottom: 1.25rem;
       user-select: none;
       flex-shrink: 0;
+      visibility: hidden;
+    }
+
+    .status-bar.is-visible {
+      visibility: visible;
     }
 
     .status-bar span {
@@ -418,8 +423,9 @@
     }
 
     async function revealLine(type, text, pauseMs) {
+      removeCursor();
       const lineEl = createLine(type, text === undefined ? "" : text);
-      await delay(pauseMs ?? rand(90, 180));
+      await delay(pauseMs ?? rand(420, 680));
       return lineEl;
     }
 
@@ -431,6 +437,8 @@
 
     function renderPostInstant(post) {
       clearFeed();
+      const statusBar = document.querySelector(".status-bar");
+      if (statusBar) statusBar.classList.add("is-visible");
       createLine("meta", buildIncomingHeader(post));
       createLine("blank");
       createLine("blank");
@@ -445,19 +453,21 @@
 
     async function transmitPost(post) {
       await delay(rand(400, 900));
+      removeCursor();
 
-      // Header aparece linha por linha (sem cursor); só o corpo é digitado
+      // INCOMING / blanks / END: linha inteira de uma vez. Só o corpo digita.
       await revealLine("meta", buildIncomingHeader(post));
-      await revealLine("blank", "");
-      await revealLine("blank", "");
-      await delay(rand(120, 240));
+      await revealLine("blank", "", rand(180, 320));
+      await revealLine("blank", "", rand(180, 320));
+      await delay(rand(200, 360));
 
       for (const line of displayLines(post)) {
         await typeLine("body", line);
         await delay(rand(180, 420));
       }
 
-      await revealLine("blank", "");
+      removeCursor();
+      await revealLine("blank", "", rand(180, 320));
       const endLine = await revealLine("meta", buildTransmissionEnd(new Date()));
       createLine("sep", SEPARATOR);
       attachCursor(endLine);
@@ -509,10 +519,21 @@
     }
 
     async function runBoot() {
+      removeCursor();
       listenerEl.textContent = "SYNC";
-      for (const item of BOOT) {
-        await revealLine(item.type, item.text, rand(140, 280));
+
+      // Status bar + [SYS] + separator: cada um aparece inteiro, um após o outro
+      const statusBar = document.querySelector(".status-bar");
+      if (statusBar) {
+        statusBar.classList.add("is-visible");
+        await delay(rand(480, 720));
       }
+
+      for (const item of BOOT) {
+        createLine(item.type, item.text);
+        await delay(rand(480, 720));
+      }
+
       listenerEl.textContent = "ACTIVE";
       bootComplete = true;
     }
