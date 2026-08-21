@@ -156,6 +156,15 @@
       50% { opacity: 0; }
     }
 
+    .line--incoming-flash {
+      animation: incoming-flash 0.5s step-end infinite;
+    }
+
+    @keyframes incoming-flash {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
     @media (max-width: 720px) {
       .layout {
         flex-direction: column;
@@ -472,7 +481,12 @@
 
       await delay(rand(180, 360));
 
-      await revealLine("meta", buildIncomingHeader(post), rand(160, 280));
+      // INCOMING pisca 5s — sinal de recepção
+      const incomingLine = createLine("meta", buildIncomingHeader(post));
+      incomingLine.classList.add("line--incoming-flash");
+      await delay(5000);
+      incomingLine.classList.remove("line--incoming-flash");
+
       await revealLine("blank", "", rand(80, 140));
       await revealLine("blank", "", rand(80, 140));
       await delay(rand(100, 200));
