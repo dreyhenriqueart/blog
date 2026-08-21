@@ -4,15 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>COMMS // ADMIN EDIT</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg: #f0ede6;
       --fg: #1a1916;
       --fg-dim: #5c5952;
       --fg-muted: #8a877f;
+      --cmd-size: 14px;
+      --cmd-leading: 1.2;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -21,20 +20,21 @@
       min-height: 100%;
       background: var(--bg);
       color: var(--fg);
-      font-family: "IBM Plex Mono", "Consolas", "Courier New", monospace;
-      font-size: 15px;
-      line-height: 1.55;
-      -webkit-font-smoothing: antialiased;
+      font-family: Consolas, "Lucida Console", monospace;
+      font-size: var(--cmd-size);
+      line-height: var(--cmd-leading);
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: unset;
     }
 
     html.is-locked .screen { display: none; }
-    .screen { max-width: 720px; padding: 1rem 16px 2rem; }
+    .screen { max-width: 720px; padding: 8px 10px 16px; }
 
     .status-bar {
       color: var(--fg-muted);
-      font-size: 13px;
-      letter-spacing: 0.04em;
-      margin-bottom: 1.5rem;
+      font-size: var(--cmd-size);
+      letter-spacing: 0;
+      margin-bottom: 1.5em;
       user-select: none;
     }
     .status-bar span { color: var(--fg-dim); }

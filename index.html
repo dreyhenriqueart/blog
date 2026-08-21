@@ -4,9 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>COMMS // VEGA-1</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg: #f0ede6;
@@ -14,6 +11,9 @@
       --fg-dim: #5c5952;
       --fg-muted: #8a877f;
       --cursor: #1a1916;
+      /* Proporções do CMD Windows 7 (Consolas 14 / line ~1.2) */
+      --cmd-size: 14px;
+      --cmd-leading: 1.2;
     }
 
     * {
@@ -26,10 +26,12 @@
       height: 100%;
       background: var(--bg);
       color: var(--fg);
-      font-family: "IBM Plex Mono", "Consolas", "Courier New", monospace;
-      font-size: 15px;
-      line-height: 1.55;
-      -webkit-font-smoothing: antialiased;
+      font-family: Consolas, "Lucida Console", monospace;
+      font-size: var(--cmd-size);
+      line-height: var(--cmd-leading);
+      font-weight: 400;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: unset;
     }
 
     body {
@@ -41,8 +43,8 @@
       min-height: 100vh;
       width: 100%;
       margin: 0;
-      padding: 1rem 16px 2rem;
-      gap: 1.25rem;
+      padding: 8px 10px 16px;
+      gap: 1.5rem;
     }
 
     .main-column {
@@ -54,11 +56,13 @@
 
     .status-bar {
       color: var(--fg-muted);
-      font-size: 13px;
-      letter-spacing: 0.04em;
-      margin-bottom: 1.25rem;
+      font-size: var(--cmd-size);
+      letter-spacing: 0;
+      margin-bottom: 1.2em;
       user-select: none;
       flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
     }
 
     .status-bar span {
@@ -78,9 +82,9 @@
 
     .sidebar-title {
       color: var(--fg-muted);
-      font-size: 12px;
-      letter-spacing: 0.04em;
-      margin-bottom: 0.75rem;
+      font-size: var(--cmd-size);
+      letter-spacing: 0;
+      margin-bottom: 0.6em;
       user-select: none;
       white-space: nowrap;
     }
@@ -101,9 +105,9 @@
       padding: 0;
       cursor: pointer;
       font: inherit;
-      font-size: 13px;
+      font-size: var(--cmd-size);
       color: var(--fg-dim);
-      line-height: 1.55;
+      line-height: var(--cmd-leading);
       white-space: nowrap;
       overflow: hidden;
     }
@@ -117,7 +121,7 @@
     }
 
     .line {
-      min-height: 1.55em;
+      min-height: calc(var(--cmd-size) * var(--cmd-leading));
     }
 
     .line--sys {
@@ -134,20 +138,20 @@
 
     .line--sep {
       color: var(--fg);
-      margin-top: 1rem;
+      margin-top: 1.2em;
     }
 
     .line--blank {
-      min-height: 1.55em;
+      min-height: calc(var(--cmd-size) * var(--cmd-leading));
     }
 
     .cursor {
       display: inline-block;
-      width: 0.58em;
-      height: 1.05em;
+      width: 0.5em;
+      height: 1em;
       background: var(--cursor);
       vertical-align: text-bottom;
-      margin-left: 1px;
+      margin-left: 0;
       animation: blink 1s step-end infinite;
     }
 
@@ -168,13 +172,17 @@
     @media (max-width: 720px) {
       .layout {
         flex-direction: column;
-        padding: 1rem 10px 1.5rem;
+        padding: 8px 8px 12px;
+      }
+
+      .status-bar {
+        white-space: normal;
       }
 
       .sidebar {
         width: 100%;
         min-width: 0;
-        padding-top: 1.25rem;
+        padding-top: 1.2em;
       }
     }
   </style>
