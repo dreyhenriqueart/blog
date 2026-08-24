@@ -88,7 +88,7 @@
     }
 
     .status-bar {
-      color: var(--fg);
+      color: var(--fg-dim);
       font: inherit;
       letter-spacing: normal;
       margin-bottom: 1em;
@@ -97,13 +97,13 @@
     }
 
     .status-bar span {
-      color: var(--fg);
+      color: var(--fg-dim);
     }
 
     .cmd-btn {
       background: none;
       border: none;
-      color: var(--fg);
+      color: var(--fg-dim);
       font: inherit;
       line-height: inherit;
       padding: 0;
@@ -127,7 +127,7 @@
     }
 
     .sidebar-title {
-      color: var(--fg);
+      color: var(--fg-dim);
       font: inherit;
       letter-spacing: normal;
       margin-bottom: 1em;
@@ -151,42 +151,46 @@
       padding: 0;
       cursor: pointer;
       font: inherit;
-      color: var(--fg);
+      color: var(--fg-dim);
       line-height: 1.15;
       white-space: nowrap;
       overflow: hidden;
     }
 
-    .archive-item:hover,
-    .archive-item.is-active {
+    .archive-item:hover {
       color: var(--fg-soft);
+    }
+
+    .archive-item.is-active {
+      color: var(--fg);
     }
 
     .line {
       min-height: 1.15em;
-      color: var(--fg);
+      color: var(--fg-dim);
       line-height: 1.15;
     }
 
-    .line--sys {
+    .line--sys,
+    .line--meta,
+    .line--sep {
       color: var(--fg-dim);
     }
 
-    .line--meta,
-    .line--body,
-    .line--sep {
-      color: var(--fg);
-    }
-
-    /* Largura do corpo = um pouco depois de CALLSIGN + nome */
+    /* Único texto “brilhante”: corpo da mensagem */
     .line--body {
+      color: var(--fg);
       max-width: var(--msg-wrap, 42ch);
     }
 
-    /* Duas linhas de espaço acima e abaixo das linhas traçadas */
+    /*
+      Uma linha de espaço:
+      - da 1ª traçada → INCOMING
+      - de END → traçada final
+    */
     .line--sep {
-      margin-top: calc(2 * 1.15em);
-      margin-bottom: calc(2 * 1.15em);
+      margin-top: 1.15em;
+      margin-bottom: 1.15em;
     }
 
     .line--blank {
