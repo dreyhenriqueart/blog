@@ -26,17 +26,6 @@
       ],
       "archived": false,
       "lost": false
-    },
-    {
-      "id": "003",
-      "sentAt": "2026-08-24T16:19:40.717Z",
-      "origin": "ASTR-7",
-      "callsign": "VEGA-1",
-      "lines": [
-        "teste"
-      ],
-      "archived": false,
-      "lost": true
     }
   ]
 }
