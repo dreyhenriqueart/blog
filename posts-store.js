@@ -1,6 +1,6 @@
 /**
  * Persistência de posts.
- * - Local (serve.ps1): POST/DELETE /api/posts + /api/posts/archive
+ * - Local (serve.ps1): POST/DELETE /api/posts + /api/posts/archive + /api/config
  * - Produção (GitHub Pages): GitHub Contents API (requer PAT com contents:write)
  */
 (function (global) {
@@ -11,13 +11,30 @@
   const TOKEN_KEY = "spacecomms-gh-token";
   const BUS_NAME = "spacecomms-live";
   const SNAP_KEY = "spacecomms-posts-snap";
+  const DEFAULT_VERSION = "4.2.1";
+
+  function normalizeVersion(value) {
+    const ver = String(value || "").trim();
+    return ver || DEFAULT_VERSION;
+  }
+
+  function normalizeStore(data) {
+    return {
+      terminalVersion: normalizeVersion(data && data.terminalVersion),
+      posts: Array.isArray(data && data.posts) ? data.posts : []
+    };
+  }
 
   function notifyLive(detail) {
     try {
       if (detail && Array.isArray(detail.posts)) {
         localStorage.setItem(
           SNAP_KEY,
-          JSON.stringify({ posts: detail.posts, t: Date.now() })
+          JSON.stringify({
+            posts: detail.posts,
+            terminalVersion: normalizeVersion(detail.terminalVersion),
+            t: Date.now()
+          })
         );
       }
       localStorage.setItem("spacecomms-live-ping", String(Date.now()));
@@ -29,17 +46,26 @@
     }
   }
 
-  function readLiveSnapshot(maxAgeMs) {
+  function readLiveSnapshotMeta(maxAgeMs) {
     try {
       const raw = localStorage.getItem(SNAP_KEY);
       if (!raw) return null;
       const data = JSON.parse(raw);
       if (!data || !Array.isArray(data.posts)) return null;
       if (maxAgeMs && Date.now() - Number(data.t || 0) > maxAgeMs) return null;
-      return data.posts;
+      return {
+        posts: data.posts,
+        terminalVersion: normalizeVersion(data.terminalVersion),
+        t: Number(data.t || 0)
+      };
     } catch {
       return null;
     }
+  }
+
+  function readLiveSnapshot(maxAgeMs) {
+    const meta = readLiveSnapshotMeta(maxAgeMs);
+    return meta ? meta.posts : null;
   }
 
   function onLiveChange(handler) {
@@ -62,53 +88,63 @@
   }
 
   function postsUrl() {
-    // Mesma origem (Pages/local) — bem mais rápido que raw.githubusercontent CDN
     return `posts.json?t=${Date.now()}`;
   }
 
-  async function fetchAllPosts(options = {}) {
+  async function fetchStoreRaw(options = {}) {
     const fresh = Boolean(options.fresh);
 
-    // Admin: lê direto da API (sem cache do Pages/raw)
     if (fresh && !isLocalHost()) {
       const token = await ensureToken();
       const meta = await getFileMeta(token);
-      const data = decodeContent(meta);
-      return Array.isArray(data.posts) ? data.posts : [];
+      return normalizeStore(decodeContent(meta));
     }
 
     try {
       const res = await fetch(postsUrl(), { cache: "no-store" });
       if (res.ok) {
-        const data = await res.json();
-        return Array.isArray(data.posts) ? data.posts : [];
+        return normalizeStore(await res.json());
       }
     } catch {
-      // fallback abaixo
+      // fallback
     }
 
-    // Fallback se posts.json local falhar
     const rawUrl = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${GH_PATH}?t=${Date.now()}`;
     const res = await fetch(rawUrl, { cache: "no-store" });
     if (!res.ok) throw new Error("posts.json unavailable");
-    const data = await res.json();
-    return Array.isArray(data.posts) ? data.posts : [];
+    return normalizeStore(await res.json());
   }
 
-  async function fetchPublishedPosts(options = {}) {
+  async function fetchStore(options = {}) {
     if (options.preferLive) {
-      const snap = readLiveSnapshot(120000);
-      // null = sem snap; [] = purge total recente (aceitar no live poll)
-      if (snap !== null && (snap.length > 0 || options.allowEmpty)) {
-        return snap
-          .filter((post) => !post.archived)
-          .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
+      const snap = readLiveSnapshotMeta(120000);
+      if (snap && (snap.posts.length > 0 || options.allowEmpty)) {
+        return {
+          terminalVersion: snap.terminalVersion,
+          posts: snap.posts
+            .filter((post) => !post.archived)
+            .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt))
+        };
       }
     }
 
-    return (await fetchAllPosts())
-      .filter((post) => !post.archived)
-      .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
+    const store = await fetchStoreRaw(options);
+    return {
+      terminalVersion: store.terminalVersion,
+      posts: store.posts
+        .filter((post) => !post.archived)
+        .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt))
+    };
+  }
+
+  async function fetchAllPosts(options = {}) {
+    const store = await fetchStoreRaw(options);
+    return store.posts;
+  }
+
+  async function fetchPublishedPosts(options = {}) {
+    const store = await fetchStore(options);
+    return store.posts;
   }
 
   function getToken() {
@@ -226,16 +262,21 @@
 
     for (let attempt = 0; attempt < 4; attempt++) {
       const meta = await getFileMeta(token);
-      const data = decodeContent(meta);
-      if (!Array.isArray(data.posts)) data.posts = [];
-
-      // Cópia para o mutator não corromper retry com dados pela metade
-      const working = JSON.parse(JSON.stringify(data.posts));
-      const result = mutator(working);
+      const store = normalizeStore(decodeContent(meta));
+      const workingPosts = JSON.parse(JSON.stringify(store.posts));
+      const result = mutator(workingPosts);
 
       try {
-        await putPosts(token, { posts: working }, meta.sha, message);
-        notifyLive({ type: "posts-changed", posts: working });
+        const next = {
+          terminalVersion: store.terminalVersion,
+          posts: workingPosts
+        };
+        await putPosts(token, next, meta.sha, message);
+        notifyLive({
+          type: "posts-changed",
+          posts: workingPosts,
+          terminalVersion: store.terminalVersion
+        });
         return result;
       } catch (err) {
         lastError = err;
@@ -252,11 +293,62 @@
 
   async function notifyAfterLocalMutate() {
     try {
-      const posts = await fetchAllPosts();
-      notifyLive({ type: "posts-changed", posts });
+      const store = await fetchStoreRaw();
+      notifyLive({
+        type: "posts-changed",
+        posts: store.posts,
+        terminalVersion: store.terminalVersion
+      });
     } catch {
       notifyLive({ type: "posts-changed" });
     }
+  }
+
+  async function setTerminalVersion(version) {
+    const terminalVersion = normalizeVersion(version);
+
+    if (isLocalHost()) {
+      const res = await fetch("api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ terminalVersion })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const result = await res.json();
+      await notifyAfterLocalMutate();
+      return result;
+    }
+
+    const token = await ensureToken();
+    let lastError = null;
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const meta = await getFileMeta(token);
+      const store = normalizeStore(decodeContent(meta));
+      store.terminalVersion = terminalVersion;
+
+      try {
+        await putPosts(token, store, meta.sha, `set terminal version ${terminalVersion}`);
+        notifyLive({
+          type: "posts-changed",
+          posts: store.posts,
+          terminalVersion
+        });
+        return { terminalVersion };
+      } catch (err) {
+        lastError = err;
+        if (err.shaConflict && attempt < 3) {
+          await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw lastError || new Error("falha ao gravar versão");
   }
 
   async function publishPost(payload) {
@@ -384,12 +476,14 @@
   global.SpaceCommsStore = {
     isLocalHost,
     postsUrl,
+    fetchStore,
     fetchAllPosts,
     fetchPublishedPosts,
     publishPost,
     deletePosts,
     purgePosts,
     archivePosts,
+    setTerminalVersion,
     getToken,
     setToken,
     ensureToken,

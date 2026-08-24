@@ -134,6 +134,9 @@
     <p class="sys-line">[SYS] uplink compose channel open</p>
 
     <form id="compose-form" class="form-block">
+      <label for="terminal-version">COMMS TERMINAL v</label>
+      <input id="terminal-version" name="terminal-version" type="text" value="4.2.1" autocomplete="off" pattern="[0-9]+(\.[0-9]+)*" title="somente o número, ex.: 4.2.1" />
+
       <label for="origin">ORIGIN</label>
       <input id="origin" name="origin" type="text" value="ASTR-7" autocomplete="off" required />
 
@@ -141,9 +144,10 @@
       <input id="callsign" name="callsign" type="text" value="VEGA-1" autocomplete="off" required />
 
       <label for="message">TRANSMISSION BODY</label>
-      <textarea id="message" name="message" placeholder="Uma linha por parÃ¡grafo." required></textarea>
+      <textarea id="message" name="message" placeholder="Uma linha por paragrafo." required></textarea>
 
       <div class="actions">
+        <button type="button" id="version-btn">COMMS&gt; set version_</button>
         <button type="submit" id="preview-btn">COMMS&gt; preview_</button>
         <button type="button" id="publish-btn">COMMS&gt; publish_</button>
       </div>
@@ -169,6 +173,8 @@
     const successEl = document.getElementById("success");
     const previewBtn = document.getElementById("preview-btn");
     const publishBtn = document.getElementById("publish-btn");
+    const versionBtn = document.getElementById("version-btn");
+    const versionInput = document.getElementById("terminal-version");
 
     function doYear(date) { return date.getFullYear() - DO_EPOCH; }
 
@@ -218,6 +224,17 @@
     function setBusy(isBusy) {
       previewBtn.disabled = isBusy;
       publishBtn.disabled = isBusy;
+      versionBtn.disabled = isBusy;
+      versionInput.disabled = isBusy;
+    }
+
+    async function loadTerminalVersion() {
+      try {
+        const store = await SpaceCommsStore.fetchStore({ fresh: true });
+        versionInput.value = store.terminalVersion || "4.2.1";
+      } catch {
+        // mantém default do input
+      }
     }
 
     function parseLines(text) {
@@ -231,7 +248,7 @@
       const lines = parseLines(message);
 
       if (!origin || !callsign || lines.length === 0) {
-        showError("[ERR] ORIGIN, CALLSIGN e corpo da transmissÃ£o sÃ£o obrigatÃ³rios.");
+        showError("[ERR] ORIGIN, CALLSIGN e corpo da transmissão são obrigatórios.");
         return null;
       }
 
@@ -239,6 +256,26 @@
     }
 
     function bindCompose() {
+      versionBtn.addEventListener("click", async () => {
+        clearStatus();
+        const version = versionInput.value.trim();
+        if (!version) {
+          showError("[ERR] informe o número da versão (ex.: 4.2.1).");
+          return;
+        }
+
+        setBusy(true);
+        try {
+          const result = await SpaceCommsStore.setTerminalVersion(version);
+          versionInput.value = result.terminalVersion;
+          showSuccess(`[SYS] terminal version set // v${result.terminalVersion}`);
+        } catch (err) {
+          showError(`[ERR] ${err.message}`);
+        } finally {
+          setBusy(false);
+        }
+      });
+
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         clearStatus();
@@ -250,8 +287,14 @@
 
         setBusy(true);
         try {
-          const existing = await SpaceCommsStore.fetchPublishedPosts();
-          localStorage.setItem(PREVIEW_KEY, JSON.stringify({ posts: [...existing, draft] }));
+          const store = await SpaceCommsStore.fetchStore();
+          localStorage.setItem(
+            PREVIEW_KEY,
+            JSON.stringify({
+              terminalVersion: store.terminalVersion,
+              posts: [...store.posts, draft]
+            })
+          );
           window.open("index.html?preview=1", "_blank");
         } catch {
           showError("[ERR] Falha ao preparar preview.");
@@ -284,6 +327,7 @@
 
     SpaceCommsAuth.mountGate({
       onReady() {
+        loadTerminalVersion();
         bindCompose();
       }
     });

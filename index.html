@@ -172,12 +172,23 @@
     }
 
     .line--sys,
-    .line--meta,
     .line--sep {
       color: var(--fg-dim);
     }
 
-    /* Único texto “brilhante”: corpo da mensagem */
+    .line--meta {
+      color: var(--fg-dim);
+    }
+
+    .meta-hi {
+      color: var(--fg);
+    }
+
+    .meta-dim {
+      color: var(--fg-dim);
+    }
+
+    /* Único texto “brilhante” contínuo: corpo da mensagem */
     .line--body {
       color: var(--fg);
       max-width: var(--msg-wrap, 42ch);
@@ -247,7 +258,7 @@
   <div class="layout">
     <main class="main-column">
       <header class="status-bar">
-        COMMS TERMINAL v4.2.1 &nbsp;|&nbsp;
+        COMMS TERMINAL v<span id="terminal-version">4.2.1</span> &nbsp;|&nbsp;
         <span id="clock">--</span> &nbsp;|&nbsp;
         LISTENER: <span id="listener">INIT</span>
         &nbsp;|&nbsp;
@@ -276,7 +287,6 @@
       { type: "sys", text: "[SYS] initializing deep space comms terminal..." },
       { type: "sys", text: "[SYS] decrypt channel // key exchange OK" },
       { type: "sys", text: "[SYS] uplink established // latency: 14m 22s" },
-      { type: "sys", text: "[SYS] listener ACTIVE — awaiting latest transmission" },
       { type: "sep", text: SEPARATOR }
     ];
 
@@ -349,15 +359,19 @@
         const raw = localStorage.getItem(PREVIEW_KEY);
         if (!raw) throw new Error("preview missing");
         const data = JSON.parse(raw);
+        applyTerminalVersion(data.terminalVersion || "4.2.1");
         return (data.posts || [])
           .filter((raw) => !raw.archived)
           .map(parsePost)
           .sort((a, b) => a.sentAt - b.sentAt);
       }
 
-      // preferLive: snapshot local primeiro (instantâneo após admin)
-      const published = await SpaceCommsStore.fetchPublishedPosts({ preferLive: true });
-      return published.map(parsePost);
+      const store = await SpaceCommsStore.fetchStore({ preferLive: true });
+      applyTerminalVersion(store.terminalVersion);
+      return store.posts
+        .filter((post) => !post.archived)
+        .map(parsePost)
+        .sort((a, b) => a.sentAt - b.sentAt);
     }
 
     function postsSignature(list) {
@@ -368,10 +382,15 @@
       if (isPreview || !bootComplete || typing) return;
 
       try {
-        const fresh = (await SpaceCommsStore.fetchPublishedPosts({
+        const store = await SpaceCommsStore.fetchStore({
           preferLive: true,
           allowEmpty: true
-        })).map(parsePost);
+        });
+        applyTerminalVersion(store.terminalVersion);
+        const fresh = store.posts
+          .filter((post) => !post.archived)
+          .map(parsePost)
+          .sort((a, b) => a.sentAt - b.sentAt);
         const freshIds = new Set(fresh.map((post) => post.id));
         const newcomers = fresh
           .filter((post) => !knownPostIds.has(post.id) && !post.lost)
@@ -512,10 +531,13 @@
       paintBootStatic();
     }
 
-    function createLine(type, text) {
+    function createLine(type, text, { html = false } = {}) {
       const el = document.createElement("div");
       el.className = `line line--${type}`;
-      if (text !== undefined) el.textContent = text;
+      if (text !== undefined) {
+        if (html) el.innerHTML = text;
+        else el.textContent = text;
+      }
       feed.appendChild(el);
       return el;
     }
@@ -557,11 +579,42 @@
       return lineEl;
     }
 
-    async function revealLine(type, text, pauseMs) {
-      // Não remove o cursor — o blink fica no fim do corpo da mensagem
-      const lineEl = createLine(type, text === undefined ? "" : text);
+    async function revealLine(type, text, pauseMs, { html = false } = {}) {
+      const lineEl = createLine(type, text === undefined ? "" : text, { html });
       await delay(pauseMs ?? rand(420, 680));
       return lineEl;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function buildIncomingHeaderHtml(post) {
+      const sentAt = post.sentAt instanceof Date ? post.sentAt : new Date(post.sentAt);
+      const stamp = escapeHtml(formatIncomingStamp(sentAt));
+      const origin = escapeHtml(post.origin);
+      const callsign = escapeHtml(post.callsign);
+      return (
+        `<span class="meta-dim">[${stamp}] &lt;&lt; </span>` +
+        `<span class="meta-hi">INCOMING</span>` +
+        `<span class="meta-dim"> // </span>` +
+        `<span class="meta-hi">ORIGIN: ${origin}</span>` +
+        `<span class="meta-dim"> / </span>` +
+        `<span class="meta-hi">CALLSIGN: ${callsign}</span>`
+      );
+    }
+
+    function buildTransmissionEndHtml(endedAt) {
+      const stamp = escapeHtml(formatIncomingStamp(endedAt));
+      return (
+        `<span class="meta-dim">[${stamp}] &lt;&lt; </span>` +
+        `<span class="meta-hi">TRANSMISSION END</span>` +
+        `<span class="meta-dim"> //</span>`
+      );
     }
 
     function buildIncomingHeader(post) {
@@ -571,7 +624,6 @@
     }
 
     function incomingWrapPrefix(post) {
-      // Limite do corpo: um pouco depois de CALLSIGN + nome
       return buildIncomingHeader(post);
     }
 
@@ -589,12 +641,17 @@
       return el;
     }
 
+    function applyTerminalVersion(version) {
+      const el = document.getElementById("terminal-version");
+      if (el) el.textContent = String(version || "4.2.1").trim() || "4.2.1";
+    }
+
     /** Bloco inteiro linha a linha (sem digitar). Usado no boot, lateral e signal lost. */
     async function revealPost(post) {
       setMessageWrap(post);
       await delay(rand(120, 240));
 
-      await revealLine("meta", buildIncomingHeader(post), rand(160, 280));
+      await revealLine("meta", buildIncomingHeaderHtml(post), rand(160, 280), { html: true });
       await revealLine("blank", "", rand(80, 140));
       await revealLine("blank", "", rand(80, 140));
 
@@ -603,10 +660,9 @@
         lastBodyLine = await revealLine("body", String(line), rand(160, 280));
       }
 
-      // Duas linhas entre fim da mensagem e END
       await revealLine("blank", "", rand(80, 140));
       await revealLine("blank", "", rand(80, 140));
-      await revealLine("meta", buildTransmissionEnd(new Date()), rand(160, 280));
+      await revealLine("meta", buildTransmissionEndHtml(new Date()), rand(160, 280), { html: true });
       createSep("end");
       if (lastBodyLine) attachCursor(lastBodyLine);
     }
@@ -621,8 +677,7 @@
       setMessageWrap(post);
       await delay(rand(180, 360));
 
-      // INCOMING pisca 5s — sinal de recepção
-      const incomingLine = createLine("meta", buildIncomingHeader(post));
+      const incomingLine = createLine("meta", buildIncomingHeaderHtml(post), { html: true });
       incomingLine.classList.add("line--incoming-flash");
       await delay(5000);
       incomingLine.classList.remove("line--incoming-flash");
@@ -637,10 +692,9 @@
         await delay(rand(120, 280));
       }
 
-      // Duas linhas entre fim da mensagem e END
       await revealLine("blank", "", rand(80, 140));
       await revealLine("blank", "", rand(80, 140));
-      await revealLine("meta", buildTransmissionEnd(new Date()), rand(160, 280));
+      await revealLine("meta", buildTransmissionEndHtml(new Date()), rand(160, 280), { html: true });
       createSep("end");
       if (lastBodyLine) attachCursor(lastBodyLine);
     }

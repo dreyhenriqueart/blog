@@ -193,6 +193,38 @@ function Set-PostsArchived($ids, $archived) {
   }
 }
 
+function Set-Config($payload) {
+  if (-not (Test-Path $PostsFile -PathType Leaf)) {
+    throw "posts.json not found"
+  }
+
+  $ver = [string]$payload.terminalVersion
+  if ([string]::IsNullOrWhiteSpace($ver)) {
+    throw "terminalVersion is required"
+  }
+
+  $raw = [System.IO.File]::ReadAllText($PostsFile, [System.Text.Encoding]::UTF8)
+  $data = $raw | ConvertFrom-Json
+
+  if ($null -eq $data.terminalVersion) {
+    $data | Add-Member -NotePropertyName terminalVersion -NotePropertyValue $ver.Trim() -Force
+  }
+  else {
+    $data.terminalVersion = $ver.Trim()
+  }
+
+  if (-not $data.posts) {
+    $data | Add-Member -NotePropertyName posts -NotePropertyValue @() -Force
+  }
+
+  $json = $data | ConvertTo-Json -Depth 10
+  [System.IO.File]::WriteAllText($PostsFile, $json, [System.Text.Encoding]::UTF8)
+
+  return @{
+    terminalVersion = [string]$data.terminalVersion
+  }
+}
+
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add($Prefix)
 
@@ -260,6 +292,21 @@ while ($listener.IsListening) {
       else {
         $payload = $body | ConvertFrom-Json
         $result = Purge-Posts @($payload.ids)
+        $out = ($result | ConvertTo-Json -Depth 10 -Compress)
+        Send-Response $response 200 $out "application/json; charset=utf-8"
+      }
+    }
+    elseif ($request.HttpMethod -eq "POST" -and $path -eq "api/config") {
+      $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+      $body = $reader.ReadToEnd()
+      $reader.Close()
+
+      if ([string]::IsNullOrWhiteSpace($body)) {
+        Send-Response $response 400 '{"error":"empty body"}' "application/json; charset=utf-8"
+      }
+      else {
+        $payload = $body | ConvertFrom-Json
+        $result = Set-Config $payload
         $out = ($result | ConvertTo-Json -Depth 10 -Compress)
         Send-Response $response 200 $out "application/json; charset=utf-8"
       }
