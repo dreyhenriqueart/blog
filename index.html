@@ -383,12 +383,16 @@
     const SEPARATOR = "────────────────────────────────────────";
     const SIDEBAR_MAX = 21;
     const POLL_MS = 2000;
+    const LATENCY_KEY = "spacecomms-latency-ms";
+    const LATENCY_MIN_MS = 5 * 60 * 1000;
+    const LATENCY_MAX_MS = 40 * 60 * 1000;
+    const LATENCY_NUDGE_MAX_MS = 2 * 60 * 1000;
     const isPreview = new URLSearchParams(location.search).get("preview") === "1";
 
     const BOOT = [
       { type: "sys", text: "[SYS] initializing deep space comms terminal..." },
       { type: "sys", text: "[SYS] decrypt channel // key exchange OK" },
-      { type: "sys", text: "[SYS] uplink established // latency: 14m 22s" },
+      { type: "sys", text: "[SYS] uplink established // latency: --" },
       { type: "sep", text: SEPARATOR }
     ];
 
@@ -398,6 +402,8 @@
     const clockEl = document.getElementById("clock");
     const themeToggleEl = document.getElementById("theme-toggle");
     const THEME_KEY = "spacecomms-theme";
+    const latencyByPost = new Map();
+    let currentLatencyMs = 14 * 60 * 1000 + 22 * 1000;
 
     function systemTheme() {
       return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
@@ -600,6 +606,85 @@
       return `${formatDoDate(date)} ${formatLocalTime(date)}`;
     }
 
+    function clampLatency(ms) {
+      return Math.min(LATENCY_MAX_MS, Math.max(LATENCY_MIN_MS, Math.round(ms)));
+    }
+
+    function formatLatency(ms) {
+      const totalSec = Math.max(0, Math.round(Number(ms) / 1000));
+      const minutes = Math.floor(totalSec / 60);
+      const seconds = totalSec % 60;
+      return `${minutes}m ${seconds}s`;
+    }
+
+    function uplinkLatencyLine(ms) {
+      return `[SYS] uplink established // latency: ${formatLatency(ms)}`;
+    }
+
+    function persistLatency() {
+      try {
+        localStorage.setItem(LATENCY_KEY, String(currentLatencyMs));
+      } catch {
+        // ignore
+      }
+    }
+
+    function initLatency() {
+      try {
+        const saved = Number(localStorage.getItem(LATENCY_KEY));
+        if (Number.isFinite(saved)) {
+          currentLatencyMs = clampLatency(saved);
+        } else {
+          currentLatencyMs = clampLatency(rand(11 * 60 * 1000, 17 * 60 * 1000));
+        }
+      } catch {
+        currentLatencyMs = clampLatency(14 * 60 * 1000 + 22 * 1000);
+      }
+      BOOT[2] = { type: "sys", text: uplinkLatencyLine(currentLatencyMs) };
+    }
+
+    function maybeNudgeLatency() {
+      // De tempos em tempos: ajusta no máximo ±2 minutos.
+      if (Math.random() > 0.42) return;
+      const delta = Math.round((Math.random() * 2 - 1) * LATENCY_NUDGE_MAX_MS);
+      currentLatencyMs = clampLatency(currentLatencyMs + delta);
+      persistLatency();
+    }
+
+    function syncBootLatencyLine(ms) {
+      const line = uplinkLatencyLine(ms);
+      BOOT[2] = { type: "sys", text: line };
+      feed.querySelectorAll(".line--sys").forEach((el) => {
+        if (/latency:/i.test(el.textContent || "")) {
+          el.textContent = line;
+        }
+      });
+    }
+
+    function getReceiveTime(post) {
+      // Hora em que o site recebeu/publicou o post.
+      return post.sentAt instanceof Date ? post.sentAt : new Date(post.sentAt);
+    }
+
+    function prepareLatencyForPost(post) {
+      const id = String(post.id);
+      if (!latencyByPost.has(id)) {
+        maybeNudgeLatency();
+        latencyByPost.set(id, currentLatencyMs);
+        persistLatency();
+      }
+      const ms = latencyByPost.get(id);
+      syncBootLatencyLine(ms);
+      return ms;
+    }
+
+    function getTransmitTime(post) {
+      // Astronauta enviou latency antes do recebimento no site.
+      const received = getReceiveTime(post);
+      const latencyMs = prepareLatencyForPost(post);
+      return new Date(received.getTime() - latencyMs);
+    }
+
     function formatSidebarLabel(post) {
       const date = formatDoDate(post.sentAt).replace(" d.O.", "");
       if (post.lost) return `${date} Lost`;
@@ -612,8 +697,8 @@
       return posts[posts.length - 1];
     }
 
-    function buildTransmissionEnd(endedAt) {
-      const stamp = formatIncomingStamp(endedAt);
+    function buildTransmissionEnd(post) {
+      const stamp = formatIncomingStamp(getReceiveTime(post));
       return `[${stamp}] << TRANSMISSION END //`;
     }
 
@@ -713,8 +798,7 @@
     }
 
     function buildIncomingHeaderHtml(post) {
-      const sentAt = post.sentAt instanceof Date ? post.sentAt : new Date(post.sentAt);
-      const stamp = escapeHtml(formatIncomingStamp(sentAt));
+      const stamp = escapeHtml(formatIncomingStamp(getTransmitTime(post)));
       const origin = escapeHtml(post.origin);
       const callsign = escapeHtml(post.callsign);
       return (
@@ -722,8 +806,8 @@
       );
     }
 
-    function buildTransmissionEndHtml(endedAt) {
-      const stamp = escapeHtml(formatIncomingStamp(endedAt));
+    function buildTransmissionEndHtml(post) {
+      const stamp = escapeHtml(formatIncomingStamp(getReceiveTime(post)));
       return `<span class="meta-dim">[${stamp}] &lt;&lt; TRANSMISSION END //</span>`;
     }
 
@@ -818,8 +902,7 @@
     }
 
     function buildIncomingHeader(post) {
-      const sentAt = post.sentAt instanceof Date ? post.sentAt : new Date(post.sentAt);
-      const stamp = formatIncomingStamp(sentAt);
+      const stamp = formatIncomingStamp(getTransmitTime(post));
       return `[${stamp}] << INCOMING // ORIGIN: ${post.origin} / CALLSIGN: ${post.callsign}`;
     }
 
@@ -848,6 +931,7 @@
 
     /** Bloco inteiro linha a linha (sem digitar). Usado no boot, lateral e signal lost. */
     async function revealPost(post) {
+      prepareLatencyForPost(post);
       setMessageWrap(post);
       await delay(rand(120, 240));
 
@@ -864,7 +948,7 @@
 
       await revealLine("blank", "", rand(80, 140));
       await revealLine("blank", "", rand(80, 140));
-      await revealLine("meta", buildTransmissionEndHtml(new Date()), rand(160, 280), { html: true });
+      await revealLine("meta", buildTransmissionEndHtml(post), rand(160, 280), { html: true });
       createSep("end");
       if (lastBodyLine) attachCursor(lastBodyLine);
     }
@@ -876,6 +960,7 @@
         return;
       }
 
+      prepareLatencyForPost(post);
       setMessageWrap(post);
       await delay(rand(180, 360));
 
@@ -898,7 +983,7 @@
 
       await revealLine("blank", "", rand(80, 140));
       await revealLine("blank", "", rand(80, 140));
-      await revealLine("meta", buildTransmissionEndHtml(new Date()), rand(160, 280), { html: true });
+      await revealLine("meta", buildTransmissionEndHtml(post), rand(160, 280), { html: true });
       createSep("end");
       if (lastBodyLine) attachCursor(lastBodyLine);
     }
@@ -938,6 +1023,7 @@
       typing = true;
       listenerEl.textContent = "RX";
       try {
+        prepareLatencyForPost(post);
         resetFeedKeepBoot();
         await revealPost(post);
       } finally {
@@ -971,6 +1057,7 @@
           const typeBody = Boolean(item.typeBody) && !post.lost;
           activePostId = post.id;
           updateSidebarActive();
+          prepareLatencyForPost(post);
           resetFeedKeepBoot();
           if (typeBody) await transmitPost(post);
           else await revealPost(post);
@@ -1005,6 +1092,7 @@
     }
 
     async function boot() {
+      initLatency();
       updateClock();
       setInterval(updateClock, 1000);
       listenerEl.textContent = "SYNC";
