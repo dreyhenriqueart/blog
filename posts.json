@@ -36,7 +36,7 @@
         "Essa é uma transmissão teste"
       ],
       "archived": false,
-      "lost": false
+      "lost": true
     }
   ]
 }
