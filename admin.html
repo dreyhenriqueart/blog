@@ -191,7 +191,7 @@
   </main>
 
   <script src="admin-auth.js"></script>
-  <script src="posts-store.js"></script>
+  <script src="posts-store.js?v=20260824b"></script>
   <script>
     const PREVIEW_KEY = "spacecomms-preview";
     const DO_EPOCH = 1000;
@@ -210,6 +210,7 @@
     const imageClear = document.getElementById("image-clear");
     const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
     let pendingImage = null;
+    let imageLoading = false;
 
     function doYear(date) { return date.getFullYear() - DO_EPOCH; }
 
@@ -267,6 +268,7 @@
 
     function clearPendingImage() {
       pendingImage = null;
+      imageLoading = false;
       imageInput.value = "";
       imagePreview.removeAttribute("src");
       imagePreviewWrap.hidden = true;
@@ -283,6 +285,49 @@
         reader.onerror = () => reject(new Error("falha ao ler imagem"));
         reader.readAsDataURL(file);
       });
+    }
+
+    function loadImageElement(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("imagem inválida"));
+        img.src = src;
+      });
+    }
+
+    async function compressImageFile(file) {
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        const img = await loadImageElement(objectUrl);
+        const maxEdge = 1600;
+        const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("canvas indisponível");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const preferPng = file.type === "image/png" || file.type === "image/gif";
+        const mime = preferPng ? "image/png" : "image/jpeg";
+        const quality = preferPng ? undefined : 0.86;
+        const dataUrl = canvas.toDataURL(mime, quality);
+        const comma = dataUrl.indexOf(",");
+        const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+        const ext = mime === "image/png" ? "png" : "jpg";
+        const baseName = String(file.name || "attachment").replace(/\.[^.]+$/, "");
+        return {
+          base64,
+          mime,
+          name: `${baseName || "attachment"}.${ext}`,
+          previewUrl: dataUrl
+        };
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
     }
 
     async function loadTerminalVersion() {
@@ -309,8 +354,19 @@
         return null;
       }
 
+      if (imageLoading) {
+        showError("[ERR] anexo ainda carregando — aguarde.");
+        return null;
+      }
+
+      const fileSelected = Boolean(imageInput.files && imageInput.files[0]);
+      if (fileSelected && !pendingImage) {
+        showError("[ERR] anexo não pronto — selecione a imagem de novo.");
+        return null;
+      }
+
       const payload = { sentAt: new Date().toISOString(), origin, callsign, lines };
-      if (pendingImage) {
+      if (pendingImage && pendingImage.base64) {
         payload.imageBase64 = pendingImage.base64;
         payload.imageName = pendingImage.name;
         payload.imageMime = pendingImage.mime;
@@ -340,18 +396,28 @@
           showError("[ERR] imagem acima de 8MB.");
           return;
         }
+
+        imageLoading = true;
+        pendingImage = null;
+        setBusy(true);
+        showSuccess("[SYS] preparing attach...");
+
         try {
-          const base64 = await fileToBase64(file);
+          const prepared = await compressImageFile(file);
           pendingImage = {
-            base64,
-            name: file.name || "attachment.jpg",
-            mime: file.type || "image/jpeg"
+            base64: prepared.base64,
+            name: prepared.name,
+            mime: prepared.mime
           };
-          imagePreview.src = URL.createObjectURL(file);
+          imagePreview.src = prepared.previewUrl;
           imagePreviewWrap.hidden = false;
+          showSuccess(`[SYS] attach ready // ${prepared.name}`);
         } catch (err) {
           clearPendingImage();
           showError(`[ERR] ${err.message}`);
+        } finally {
+          imageLoading = false;
+          setBusy(false);
         }
       });
 
@@ -408,7 +474,7 @@
           );
           window.open("index.html?preview=1", "_blank");
         } catch {
-          showError("[ERR] Falha ao preparar preview.");
+          showError("[ERR] Falha ao preparar preview (anexo grande demais p/ preview).");
         } finally {
           setBusy(false);
         }
@@ -420,13 +486,20 @@
         const payload = readComposePayload();
         if (!payload) return;
 
+        const hadAttach = Boolean(payload.imageBase64);
         const publishPayload = { ...payload };
         delete publishPayload.image;
 
         setBusy(true);
         try {
           const created = await SpaceCommsStore.publishPost(publishPayload);
-          showSuccess(`[SYS] published // id ${created.id} // uplink stored`);
+          if (hadAttach && !(created.image && created.image.src)) {
+            throw new Error("publicado sem anexo — tente outra imagem");
+          }
+          const attachInfo = created.image
+            ? ` // attach ${created.image.name}`
+            : "";
+          showSuccess(`[SYS] published // id ${created.id}${attachInfo}`);
           document.getElementById("message").value = "";
           clearPendingImage();
         } catch (err) {

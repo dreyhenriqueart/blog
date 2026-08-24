@@ -362,6 +362,55 @@
     return normalizeImageField({ src: path, name: safeName });
   }
 
+  function inlineImageField(payload) {
+    if (!payload || !payload.imageBase64) return undefined;
+    const base64 = String(payload.imageBase64).replace(/\s/g, "");
+    if (!base64) return undefined;
+    const mime = String(payload.imageMime || "image/jpeg");
+    const name = String(payload.imageName || "attachment.jpg")
+      .replace(/[^\w.\-()+ ]+/g, "_")
+      .slice(0, 120) || "attachment.jpg";
+    return normalizeImageField({
+      src: `data:${mime};base64,${base64}`,
+      name
+    });
+  }
+
+  async function resolvePublishImage(payload) {
+    if (!payload) return undefined;
+    if (!payload.imageBase64 && !(payload.image && payload.image.src)) {
+      return undefined;
+    }
+
+    if (payload.imageBase64) {
+      const approxBytes = Math.floor(
+        (String(payload.imageBase64).replace(/\s/g, "").length * 3) / 4
+      );
+
+      // Até ~550KB: grava data URL no posts.json junto com o post (atômico).
+      if (approxBytes <= 550000) {
+        const inline = inlineImageField(payload);
+        if (inline) return inline;
+      }
+
+      // Maior: sobe arquivo em media/ e referencia o path.
+      try {
+        const uploaded = await uploadImageAsset(payload);
+        if (uploaded && uploaded.src) return uploaded;
+      } catch (err) {
+        if (approxBytes <= 900000) {
+          const inline = inlineImageField(payload);
+          if (inline) return inline;
+        }
+        throw new Error(err.message || "falha ao gravar anexo");
+      }
+
+      throw new Error("anexo não foi gravado");
+    }
+
+    return normalizeImageField(payload.image);
+  }
+
   async function mutateRemote(mutator, message) {
     const token = await ensureToken();
     let lastError = null;
@@ -473,16 +522,15 @@
       return created;
     }
 
-    let image = undefined;
+    const wantsImage = Boolean(payload.imageBase64 || (payload.image && payload.image.src));
+    const image = await resolvePublishImage(payload);
 
-    if (payload.imageBase64) {
-      image = await uploadImageAsset(payload);
-    } else if (payload.image && payload.image.src) {
-      image = normalizeImageField(payload.image);
+    if (wantsImage && !(image && image.src)) {
+      throw new Error("anexo selecionado, mas não foi possível gravar a imagem");
     }
 
-    return mutateRemote((posts) => {
-      const created = {
+    const created = await mutateRemote((posts) => {
+      const next = {
         id: nextId(posts),
         sentAt: payload.sentAt || new Date().toISOString(),
         origin: payload.origin,
@@ -491,10 +539,16 @@
         archived: false,
         lost: false
       };
-      if (image) created.image = image;
-      posts.push(created);
-      return created;
+      if (image) next.image = image;
+      posts.push(next);
+      return next;
     }, `publish transmission ${Date.now()}`);
+
+    if (wantsImage && !(created && created.image && created.image.src)) {
+      throw new Error("post publicado sem anexo — tente de novo");
+    }
+
+    return created;
   }
 
   async function deletePosts(ids) {
