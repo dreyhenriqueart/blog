@@ -17,6 +17,7 @@
       --bg: #0c0c14;
       --fg: #cccccc;
       --fg-soft: #e8e8e8;
+      --fg-dim: #808080;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,40 +38,15 @@
 
     .status-bar {
       color: var(--fg);
-      font-size: inherit;
-      letter-spacing: normal;
       margin-bottom: 1.5rem;
       user-select: none;
     }
     .status-bar span { color: var(--fg); }
     .sys-line { color: var(--fg); margin-bottom: 0.5rem; }
 
-    label {
-      display: block;
-      color: var(--fg);
-      font-size: inherit;
-      margin-bottom: 0.35rem;
-    }
-
-    input {
-      display: block;
-      width: 100%;
-      background: var(--bg);
-      color: var(--fg);
-      border: none;
-      border-bottom: 1px solid var(--fg);
-      font: inherit;
-      line-height: 1;
-      padding: 0.25rem 0;
-      margin-bottom: 1.25rem;
-      outline: none;
-    }
-    input:focus { border-bottom-color: var(--fg); }
-    .form-block { margin-top: 1.5rem; }
-
     .nav-link {
       display: inline-block;
-      margin-top: 1rem;
+      margin-top: 1.5rem;
       margin-right: 1.25rem;
       color: var(--fg);
       text-decoration: none;
@@ -80,8 +56,6 @@
 
     .manage-title {
       color: var(--fg);
-      font-size: inherit;
-      letter-spacing: normal;
       margin: 1.5rem 0 0.75rem;
     }
 
@@ -106,7 +80,6 @@
       background: none;
       border: none;
       font: inherit;
-      font-size: inherit;
       color: var(--fg);
       cursor: pointer;
       padding: 0;
@@ -116,11 +89,11 @@
     }
     .post-row__name:hover,
     .post-row__name.is-open { color: var(--fg-soft); }
+    .post-row__name.is-lost { color: var(--fg-dim); }
 
     .post-preview {
       display: none;
       color: var(--fg);
-      font-size: inherit;
       white-space: pre-wrap;
       margin: 0.25rem 0 0.75rem 1.35rem;
     }
@@ -128,7 +101,6 @@
 
     .manage-empty {
       color: var(--fg);
-      font-size: inherit;
       margin-bottom: 1rem;
     }
 
@@ -168,25 +140,24 @@
     </header>
 
     <p class="sys-line">[SYS] transmission registry open</p>
-    <p class="sys-line">[SYS] click name to read // checkbox + delete to mark Lost</p>
 
     <div class="manage-title">Transmissions</div>
     <ul id="post-list"></ul>
     <p id="manage-empty" class="manage-empty" hidden>[SYS] no transmissions stored</p>
 
     <div class="actions">
-      <button type="button" id="delete-btn">COMMS&gt; delete selected_</button>
+      <button type="button" id="delete-btn">COMMS&gt; delete_</button>
+      <button type="button" id="purge-btn">COMMS&gt; purge_</button>
     </div>
 
     <p id="status-error" class="status-msg error" role="alert"></p>
     <p id="status-success" class="status-msg success" role="status"></p>
 
-    <a class="nav-link" href="admin-deleted.html">COMMS&gt; deleted_</a>
     <a class="nav-link" href="admin.html">COMMS&gt; compose_</a>
   </main>
 
   <script src="admin-auth.js"></script>
-  <script src="posts-store.js?v=20260824b"></script>
+  <script src="posts-store.js?v=20260824c"></script>
   <script>
     const DO_EPOCH = 1000;
     const SIDEBAR_MAX = 21;
@@ -195,6 +166,7 @@
     const postListEl = document.getElementById("post-list");
     const manageEmptyEl = document.getElementById("manage-empty");
     const deleteBtn = document.getElementById("delete-btn");
+    const purgeBtn = document.getElementById("purge-btn");
     const errorEl = document.getElementById("status-error");
     const successEl = document.getElementById("status-success");
 
@@ -245,12 +217,14 @@
 
     function setBusy(isBusy) {
       deleteBtn.disabled = isBusy;
+      purgeBtn.disabled = isBusy;
     }
 
     function formatPostLabel(post) {
       const date = formatDoDate(new Date(post.sentAt)).replace(" d.O.", "");
-      const text = post.lines.join(" ").trim().slice(0, SIDEBAR_MAX);
-      return `${date} ${text}`;
+      const text = (post.lost ? "signal lost" : post.lines.join(" ").trim()).slice(0, SIDEBAR_MAX);
+      const mark = post.lost ? " [lost]" : "";
+      return `${date} ${text}${mark}`;
     }
 
     function getSelectedPostIds() {
@@ -266,9 +240,8 @@
       let posts = [];
       try {
         posts = await SpaceCommsStore.fetchAllPosts({ fresh: true });
-        posts = posts.filter((post) => !post.lost);
       } catch {
-        showError("[ERR] nÃ£o foi possÃ­vel carregar transmissÃµes.");
+        showError("[ERR] falha ao carregar transmissoes.");
         manageEmptyEl.hidden = true;
         return;
       }
@@ -294,12 +267,14 @@
 
         const nameBtn = document.createElement("button");
         nameBtn.type = "button";
-        nameBtn.className = "post-row__name";
+        nameBtn.className = "post-row__name" + (post.lost ? " is-lost" : "");
         nameBtn.textContent = formatPostLabel(post);
 
         const preview = document.createElement("div");
         preview.className = "post-preview";
-        preview.textContent = post.lines.join("\n");
+        preview.textContent = post.lost
+          ? "signal lost"
+          : (Array.isArray(post.lines) ? post.lines.join("\n") : "");
 
         nameBtn.addEventListener("click", () => {
           const open = preview.classList.toggle("is-open");
@@ -318,7 +293,7 @@
       deleteBtn.addEventListener("click", async () => {
         const ids = getSelectedPostIds();
         if (ids.length === 0) {
-          showError("[ERR] selecione ao menos uma transmissÃ£o.");
+          showError("[ERR] selecione ao menos uma transmissao.");
           return;
         }
 
@@ -326,9 +301,32 @@
         try {
           const result = await SpaceCommsStore.deletePosts(ids);
           if (!result.removed) {
-            showError("[ERR] nenhuma transmissÃ£o removida.");
+            showError("[ERR] nenhuma transmissao marcada lost.");
           } else {
-            showSuccess(`[SYS] moved to deleted // ${result.removed}`);
+            showSuccess(`[SYS] signal lost // ${result.removed}`);
+          }
+          await renderPostList();
+        } catch (err) {
+          showError(`[ERR] ${err.message}`);
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      purgeBtn.addEventListener("click", async () => {
+        const ids = getSelectedPostIds();
+        if (ids.length === 0) {
+          showError("[ERR] selecione ao menos uma transmissao.");
+          return;
+        }
+
+        setBusy(true);
+        try {
+          const result = await SpaceCommsStore.purgePosts(ids);
+          if (!result.purged) {
+            showError("[ERR] nenhuma transmissao removida.");
+          } else {
+            showSuccess(`[SYS] purged // ${result.purged}`);
           }
           await renderPostList();
         } catch (err) {

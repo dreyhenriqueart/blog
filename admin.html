@@ -38,8 +38,6 @@
 
     .status-bar {
       color: var(--fg);
-      font-size: inherit;
-      letter-spacing: normal;
       margin-bottom: 1.5rem;
       user-select: none;
     }
@@ -51,11 +49,39 @@
     label {
       display: block;
       color: var(--fg);
-      font-size: inherit;
       margin-bottom: 0.35rem;
     }
 
-    input, textarea {
+    .field-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid var(--fg);
+    }
+
+    .field-row input {
+      flex: 1;
+      min-width: 0;
+      display: block;
+      width: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      border: none;
+      font: inherit;
+      line-height: 1;
+      padding: 0.25rem 0;
+      margin: 0;
+      outline: none;
+    }
+
+    .field-row .field-action {
+      flex: 0 0 auto;
+      align-self: center;
+      padding: 0 0.15rem;
+    }
+
+    input:not([type="file"]), textarea {
       display: block;
       width: 100%;
       background: var(--bg);
@@ -69,12 +95,6 @@
       outline: none;
     }
 
-    input[type="file"] {
-      border-bottom: 1px solid var(--fg);
-      padding: 0.35rem 0;
-      color: var(--fg);
-    }
-
     input:focus, textarea:focus { border-bottom-color: var(--fg); }
 
     textarea {
@@ -83,21 +103,45 @@
       white-space: pre-wrap;
     }
 
-    .image-preview-wrap {
-      margin-top: -0.5rem;
+    .attach-box {
+      position: relative;
       margin-bottom: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.5rem;
+      border-bottom: 1px solid var(--fg);
+      padding: 0.35rem 1.75rem 0.5rem 0;
+      min-height: 2rem;
     }
 
-    .image-preview-wrap img {
+    .attach-box input[type="file"] {
+      display: block;
+      width: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      border: none;
+      font: inherit;
+      padding: 0;
+      margin: 0;
+    }
+
+    .attach-box .attach-x {
+      position: absolute;
+      top: 0.2rem;
+      right: 0;
+      line-height: 1;
+      padding: 0.15rem 0.25rem;
+    }
+
+    .attach-box .attach-x[hidden] { display: none; }
+
+    .attach-box img {
+      display: block;
       max-width: 160px;
       max-height: 96px;
       object-fit: contain;
+      margin-top: 0.5rem;
       border: 1px solid var(--fg);
     }
+
+    .attach-box img[hidden] { display: none; }
 
     .form-block { margin-top: 1.5rem; }
 
@@ -132,8 +176,6 @@
     button:hover { color: var(--fg-soft); }
     button:disabled { color: var(--fg-soft); cursor: wait; }
 
-    .hint { color: var(--fg); font-size: inherit; margin-top: 1rem; }
-
     .status-msg { margin-top: 0.75rem; display: none; }
     .status-msg.is-visible { display: block; }
     .error { color: var(--fg); }
@@ -157,7 +199,10 @@
 
     <form id="compose-form" class="form-block">
       <label for="terminal-version">COMMS TERMINAL v</label>
-      <input id="terminal-version" name="terminal-version" type="text" value="4.2.1" autocomplete="off" pattern="[0-9]+(\.[0-9]+)*" title="somente o número, ex.: 4.2.1" />
+      <div class="field-row">
+        <input id="terminal-version" name="terminal-version" type="text" value="4.2.1" autocomplete="off" pattern="[0-9]+(\.[0-9]+)*" title="somente o número, ex.: 4.2.1" />
+        <button type="button" id="version-btn" class="field-action" aria-label="Aplicar versão">set_</button>
+      </div>
 
       <label for="origin">ORIGIN</label>
       <input id="origin" name="origin" type="text" value="ASTR-7" autocomplete="off" required />
@@ -168,30 +213,27 @@
       <label for="message">TRANSMISSION BODY</label>
       <textarea id="message" name="message" placeholder="Uma linha por paragrafo." required></textarea>
 
-      <label for="image">ATTACHMENT (imagem opcional)</label>
-      <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
-      <div id="image-preview-wrap" class="image-preview-wrap" hidden>
-        <img id="image-preview" alt="Previa do anexo" />
-        <button type="button" id="image-clear">COMMS&gt; clear attach_</button>
+      <label for="image">ATTACHMENT</label>
+      <div class="attach-box" id="attach-box">
+        <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
+        <button type="button" id="image-clear" class="attach-x" hidden aria-label="Remover anexo">X</button>
+        <img id="image-preview" alt="" hidden />
       </div>
 
       <div class="actions">
-        <button type="button" id="version-btn">COMMS&gt; set version_</button>
         <button type="submit" id="preview-btn">COMMS&gt; preview_</button>
         <button type="button" id="publish-btn">COMMS&gt; publish_</button>
       </div>
 
       <p id="error" class="status-msg error" role="alert"></p>
       <p id="success" class="status-msg success" role="status"></p>
-      <p class="hint">Entre com a senha do admin. Depois disso, publish e edit funcionam sem pedir nada.</p>
     </form>
 
     <a class="nav-link" href="admin-edit.html">COMMS&gt; edit_</a>
-    <a class="nav-link" href="admin-deleted.html">COMMS&gt; deleted_</a>
   </main>
 
   <script src="admin-auth.js"></script>
-  <script src="posts-store.js?v=20260824b"></script>
+  <script src="posts-store.js?v=20260824c"></script>
   <script>
     const PREVIEW_KEY = "spacecomms-preview";
     const DO_EPOCH = 1000;
@@ -205,7 +247,6 @@
     const versionBtn = document.getElementById("version-btn");
     const versionInput = document.getElementById("terminal-version");
     const imageInput = document.getElementById("image");
-    const imagePreviewWrap = document.getElementById("image-preview-wrap");
     const imagePreview = document.getElementById("image-preview");
     const imageClear = document.getElementById("image-clear");
     const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -271,20 +312,8 @@
       imageLoading = false;
       imageInput.value = "";
       imagePreview.removeAttribute("src");
-      imagePreviewWrap.hidden = true;
-    }
-
-    function fileToBase64(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = String(reader.result || "");
-          const comma = result.indexOf(",");
-          resolve(comma >= 0 ? result.slice(comma + 1) : result);
-        };
-        reader.onerror = () => reject(new Error("falha ao ler imagem"));
-        reader.readAsDataURL(file);
-      });
+      imagePreview.hidden = true;
+      imageClear.hidden = true;
     }
 
     function loadImageElement(src) {
@@ -400,7 +429,6 @@
         imageLoading = true;
         pendingImage = null;
         setBusy(true);
-        showSuccess("[SYS] preparing attach...");
 
         try {
           const prepared = await compressImageFile(file);
@@ -410,8 +438,9 @@
             mime: prepared.mime
           };
           imagePreview.src = prepared.previewUrl;
-          imagePreviewWrap.hidden = false;
-          showSuccess(`[SYS] attach ready // ${prepared.name}`);
+          imagePreview.hidden = false;
+          imageClear.hidden = false;
+          clearStatus();
         } catch (err) {
           clearPendingImage();
           showError(`[ERR] ${err.message}`);
@@ -438,7 +467,7 @@
         try {
           const result = await SpaceCommsStore.setTerminalVersion(version);
           versionInput.value = result.terminalVersion;
-          showSuccess(`[SYS] terminal version set // v${result.terminalVersion}`);
+          showSuccess(`[SYS] v${result.terminalVersion}`);
         } catch (err) {
           showError(`[ERR] ${err.message}`);
         } finally {
@@ -474,7 +503,7 @@
           );
           window.open("index.html?preview=1", "_blank");
         } catch {
-          showError("[ERR] Falha ao preparar preview (anexo grande demais p/ preview).");
+          showError("[ERR] falha no preview");
         } finally {
           setBusy(false);
         }
@@ -496,9 +525,7 @@
           if (hadAttach && !(created.image && created.image.src)) {
             throw new Error("publicado sem anexo — tente outra imagem");
           }
-          const attachInfo = created.image
-            ? ` // attach ${created.image.name}`
-            : "";
+          const attachInfo = created.image ? ` // attach` : "";
           showSuccess(`[SYS] published // id ${created.id}${attachInfo}`);
           document.getElementById("message").value = "";
           clearPendingImage();
