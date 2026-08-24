@@ -183,14 +183,22 @@
       max-width: var(--msg-wrap, 42ch);
     }
 
-    /*
-      Uma linha de espaço:
-      - da 1ª traçada → INCOMING
-      - de END → traçada final
-    */
+    /* Separadores: espaçamento controlado por classe */
     .line--sep {
-      margin-top: 1.15em;
-      margin-bottom: 1.15em;
+      margin-top: 0;
+      margin-bottom: 0;
+    }
+
+    /* SYS → traçada: duas linhas; traçada → INCOMING: zero */
+    .line--sep-boot {
+      margin-top: calc(2 * 1.15em);
+      margin-bottom: 0;
+    }
+
+    /* END → traçada final: zero */
+    .line--sep-end {
+      margin-top: 0;
+      margin-bottom: 0;
     }
 
     .line--blank {
@@ -494,7 +502,8 @@
     /** Repõe o bloco [SYS] instantâneo (não reanima). Mantém o que já funcionava no boot. */
     function paintBootStatic() {
       for (const item of BOOT) {
-        createLine(item.type, item.text);
+        if (item.type === "sep") createSep("boot");
+        else createLine(item.type, item.text);
       }
     }
 
@@ -558,7 +567,7 @@
     function buildIncomingHeader(post) {
       const sentAt = post.sentAt instanceof Date ? post.sentAt : new Date(post.sentAt);
       const stamp = formatIncomingStamp(sentAt);
-      return `[${stamp}] << INCOMING // ORIGIN: ${post.origin} / CALLSIGN ${post.callsign}`;
+      return `[${stamp}] << INCOMING // ORIGIN: ${post.origin} / CALLSIGN: ${post.callsign}`;
     }
 
     function incomingWrapPrefix(post) {
@@ -571,6 +580,13 @@
         "--msg-wrap",
         `${incomingWrapPrefix(post).length + 4}ch`
       );
+    }
+
+    function createSep(kind) {
+      const el = createLine("sep", SEPARATOR);
+      if (kind === "boot") el.classList.add("line--sep-boot");
+      if (kind === "end") el.classList.add("line--sep-end");
+      return el;
     }
 
     /** Bloco inteiro linha a linha (sem digitar). Usado no boot, lateral e signal lost. */
@@ -587,9 +603,11 @@
         lastBodyLine = await revealLine("body", String(line), rand(160, 280));
       }
 
+      // Duas linhas entre fim da mensagem e END
+      await revealLine("blank", "", rand(80, 140));
       await revealLine("blank", "", rand(80, 140));
       await revealLine("meta", buildTransmissionEnd(new Date()), rand(160, 280));
-      createLine("sep", SEPARATOR);
+      createSep("end");
       if (lastBodyLine) attachCursor(lastBodyLine);
     }
 
@@ -619,9 +637,11 @@
         await delay(rand(120, 280));
       }
 
+      // Duas linhas entre fim da mensagem e END
+      await revealLine("blank", "", rand(80, 140));
       await revealLine("blank", "", rand(80, 140));
       await revealLine("meta", buildTransmissionEnd(new Date()), rand(160, 280));
-      createLine("sep", SEPARATOR);
+      createSep("end");
       if (lastBodyLine) attachCursor(lastBodyLine);
     }
 
@@ -673,7 +693,8 @@
       listenerEl.textContent = "SYNC";
 
       for (const item of BOOT) {
-        createLine(item.type, item.text);
+        if (item.type === "sep") createSep("boot");
+        else createLine(item.type, item.text);
         await delay(rand(220, 380));
       }
 
@@ -748,7 +769,7 @@
       if (posts.length === 0) {
         listenerEl.textContent = "IDLE";
         createLine("sys", "[SYS] no transmissions on uplink");
-        createLine("sep", SEPARATOR);
+        createSep("end");
         bootComplete = true;
         startLiveListener();
         return;
