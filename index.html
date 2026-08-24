@@ -35,6 +35,7 @@
       --bg: #0c0c14;
       --fg: #cccccc;
       --fg-soft: #e8e8e8;
+      --fg-dim: #808080;
       --cursor: #cccccc;
     }
 
@@ -42,6 +43,7 @@
       --bg: #cccccc;
       --fg: #0c0c14;
       --fg-soft: #3a3a48;
+      --fg-dim: #808080;
       --cursor: #0c0c14;
     }
 
@@ -166,20 +168,25 @@
       line-height: 1.15;
     }
 
-    .line--sys,
+    .line--sys {
+      color: var(--fg-dim);
+    }
+
     .line--meta,
     .line--body,
     .line--sep {
       color: var(--fg);
     }
 
-    /* Largura do corpo = fim de "INCOMING" no header da transmissão */
+    /* Largura do corpo = um pouco depois de CALLSIGN + nome */
     .line--body {
       max-width: var(--msg-wrap, 42ch);
     }
 
+    /* Duas linhas de espaço acima e abaixo das linhas traçadas */
     .line--sep {
-      margin-top: 0;
+      margin-top: calc(2 * 1.15em);
+      margin-bottom: calc(2 * 1.15em);
     }
 
     .line--blank {
