@@ -376,7 +376,7 @@
     </div>
   </div>
 
-  <script src="posts-store.js?v=20260824b"></script>
+  <script src="posts-store.js?v=20260824d"></script>
   <script>
     const PREVIEW_KEY = "spacecomms-preview";
     const DO_EPOCH = 1000; // Mil d.O. — ano real menos 1000 (ex.: 2026 → 1026 d.O.)
@@ -481,7 +481,9 @@
     }
 
     function postsSignature(list) {
-      return list.map((p) => `${p.id}:${p.lost ? 1 : 0}`).join("|");
+      return list
+        .map((p) => `${p.id}:${p.lost ? 1 : 0}:${(p.lines || []).join("\u0001")}`)
+        .join("|");
     }
 
     async function pollForNewPosts() {
@@ -505,6 +507,12 @@
         const prevActive = posts.find((p) => p.id === activePostId);
         const activeNow = fresh.find((p) => p.id === activePostId);
         const activeBecameLost = Boolean(activeNow && activeNow.lost && prevActive && !prevActive.lost);
+        const activeTextChanged = Boolean(
+          activeNow &&
+          prevActive &&
+          !activeNow.lost &&
+          (prevActive.lines || []).join("\n") !== (activeNow.lines || []).join("\n")
+        );
 
         if (newcomers.length === 0 && !signatureChanged) return;
 
@@ -526,6 +534,11 @@
         }
 
         if (activeBecameLost) {
+          enqueuePost(activeNow, { typeBody: false });
+          return;
+        }
+
+        if (activeTextChanged) {
           enqueuePost(activeNow, { typeBody: false });
           return;
         }

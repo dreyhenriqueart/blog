@@ -178,6 +178,50 @@ function Purge-Posts($ids) {
   }
 }
 
+function Update-Post($payload) {
+  if (-not (Test-Path $PostsFile -PathType Leaf)) {
+    throw "posts.json not found"
+  }
+
+  $id = [string]$payload.id
+  $lines = @($payload.lines)
+
+  if ([string]::IsNullOrWhiteSpace($id)) {
+    throw "id is required"
+  }
+  if ($lines.Count -eq 0) {
+    throw "lines are required"
+  }
+
+  $raw = [System.IO.File]::ReadAllText($PostsFile, [System.Text.Encoding]::UTF8)
+  $data = $raw | ConvertFrom-Json
+
+  if (-not $data.posts) {
+    throw "no posts to update"
+  }
+
+  $found = $null
+  foreach ($post in @($data.posts)) {
+    if ([string]$post.id -eq $id) {
+      $post.lines = @($lines | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+      if (@($post.lines).Count -eq 0) {
+        throw "lines are required"
+      }
+      $found = $post
+      break
+    }
+  }
+
+  if ($null -eq $found) {
+    throw "post not found"
+  }
+
+  $json = $data | ConvertTo-Json -Depth 10
+  [System.IO.File]::WriteAllText($PostsFile, $json, [System.Text.Encoding]::UTF8)
+
+  return $found
+}
+
 function Set-PostsArchived($ids, $archived) {
   if (-not (Test-Path $PostsFile -PathType Leaf)) {
     throw "posts.json not found"
@@ -309,6 +353,21 @@ while ($listener.IsListening) {
         $payload = $body | ConvertFrom-Json
         $result = Remove-Posts @($payload.ids)
         $out = ($result | ConvertTo-Json -Depth 10 -Compress)
+        Send-Response $response 200 $out "application/json; charset=utf-8"
+      }
+    }
+    elseif ($request.HttpMethod -eq "POST" -and $path -eq "api/posts/update") {
+      $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+      $body = $reader.ReadToEnd()
+      $reader.Close()
+
+      if ([string]::IsNullOrWhiteSpace($body)) {
+        Send-Response $response 400 '{"error":"empty body"}' "application/json; charset=utf-8"
+      }
+      else {
+        $payload = $body | ConvertFrom-Json
+        $updated = Update-Post $payload
+        $out = ($updated | ConvertTo-Json -Depth 10 -Compress)
         Send-Response $response 200 $out "application/json; charset=utf-8"
       }
     }

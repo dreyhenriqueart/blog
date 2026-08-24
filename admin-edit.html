@@ -95,11 +95,35 @@
 
     .post-preview {
       display: none;
-      color: var(--fg);
-      white-space: pre-wrap;
-      margin: 0.25rem 0 0.75rem 1.35rem;
+      margin: 0.35rem 0 0.9rem 1.35rem;
     }
     .post-preview.is-open { display: block; }
+
+    .post-preview textarea {
+      display: block;
+      width: 100%;
+      min-height: 7.5rem;
+      background: var(--bg);
+      color: var(--fg);
+      border: none;
+      border-bottom: 1px solid var(--fg-dim);
+      font: inherit;
+      line-height: 1.15;
+      padding: 0.25rem 0;
+      margin: 0 0 0.5rem;
+      outline: none;
+      resize: vertical;
+      white-space: pre-wrap;
+    }
+
+    .post-preview .apply-btn {
+      color: var(--fg-dim);
+    }
+
+    .post-preview .apply-btn:hover,
+    .post-preview .apply-btn:focus-visible {
+      color: var(--fg);
+    }
 
     .manage-empty {
       color: var(--fg-dim);
@@ -175,7 +199,7 @@
   </main>
 
   <script src="admin-auth.js"></script>
-  <script src="posts-store.js?v=20260824c"></script>
+  <script src="posts-store.js?v=20260824d"></script>
   <script>
     const DO_EPOCH = 1000;
     const SIDEBAR_MAX = 21;
@@ -236,6 +260,16 @@
     function setBusy(isBusy) {
       deleteBtn.disabled = isBusy;
       purgeBtn.disabled = isBusy;
+      postListEl.querySelectorAll(".apply-btn, textarea").forEach((el) => {
+        el.disabled = isBusy;
+      });
+    }
+
+    function parseLines(text) {
+      return String(text || "")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
     }
 
     function formatPostLabel(post) {
@@ -249,6 +283,33 @@
       return [...postListEl.querySelectorAll('input[type="checkbox"]:checked')].map(
         (input) => input.value
       );
+    }
+
+    async function applyPostEdit(postId, textarea, nameBtn) {
+      const lines = parseLines(textarea.value);
+      if (lines.length === 0) {
+        showError("[ERR] corpo da transmissao vazio.");
+        return;
+      }
+
+      clearStatus();
+      setBusy(true);
+      try {
+        const updated = await SpaceCommsStore.updatePost(postId, { lines });
+        textarea.value = (updated.lines || lines).join("\n");
+        if (nameBtn && !nameBtn.classList.contains("is-lost")) {
+          nameBtn.textContent = formatPostLabel({
+            ...updated,
+            sentAt: updated.sentAt || new Date().toISOString(),
+            lost: Boolean(updated.lost)
+          });
+        }
+        showSuccess(`[SYS] updated // id ${postId}`);
+      } catch (err) {
+        showError(`[ERR] ${err.message}`);
+      } finally {
+        setBusy(false);
+      }
     }
 
     async function renderPostList() {
@@ -290,14 +351,28 @@
 
         const preview = document.createElement("div");
         preview.className = "post-preview";
-        preview.textContent = post.lost
-          ? "signal lost"
-          : (Array.isArray(post.lines) ? post.lines.join("\n") : "");
+
+        const textarea = document.createElement("textarea");
+        textarea.value = Array.isArray(post.lines) ? post.lines.join("\n") : "";
+        textarea.setAttribute("aria-label", `Editar transmissao ${post.id}`);
+
+        const applyBtn = document.createElement("button");
+        applyBtn.type = "button";
+        applyBtn.className = "apply-btn";
+        applyBtn.textContent = "apply_";
+
+        applyBtn.addEventListener("click", () => {
+          applyPostEdit(post.id, textarea, nameBtn);
+        });
 
         nameBtn.addEventListener("click", () => {
           const open = preview.classList.toggle("is-open");
           nameBtn.classList.toggle("is-open", open);
+          if (open) textarea.focus();
         });
+
+        preview.appendChild(textarea);
+        preview.appendChild(applyBtn);
 
         row.appendChild(checkbox);
         row.appendChild(nameBtn);

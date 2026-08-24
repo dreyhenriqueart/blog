@@ -551,6 +551,37 @@
     return created;
   }
 
+  async function updatePost(id, payload) {
+    const lines = Array.isArray(payload && payload.lines)
+      ? payload.lines.map((line) => String(line)).filter((line) => line.trim().length > 0)
+      : [];
+
+    if (!id) throw new Error("id is required");
+    if (lines.length === 0) throw new Error("lines are required");
+
+    if (isLocalHost()) {
+      const res = await fetch("api/posts/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: String(id), lines })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const updated = await res.json();
+      await notifyAfterLocalMutate();
+      return updated;
+    }
+
+    return mutateRemote((posts) => {
+      const post = posts.find((item) => String(item.id) === String(id));
+      if (!post) throw new Error("post not found");
+      post.lines = lines;
+      return post;
+    }, `edit transmission ${id}`);
+  }
+
   async function deletePosts(ids) {
     if (isLocalHost()) {
       const res = await fetch("api/posts", {
@@ -649,6 +680,7 @@
     fetchAllPosts,
     fetchPublishedPosts,
     publishPost,
+    updatePost,
     deletePosts,
     purgePosts,
     archivePosts,
