@@ -384,9 +384,10 @@
     const SIDEBAR_MAX = 21;
     const POLL_MS = 2000;
     const LATENCY_KEY = "spacecomms-latency-ms";
-    const LATENCY_MIN_MS = 5 * 60 * 1000;
-    const LATENCY_MAX_MS = 40 * 60 * 1000;
-    const LATENCY_NUDGE_MAX_MS = 2 * 60 * 1000;
+    const LATENCY_ORIGIN_KEY = "spacecomms-latency-origin";
+    const LATENCY_MIN_MS = 14 * 60 * 1000;
+    const LATENCY_MAX_MS = 25 * 60 * 1000;
+    const LATENCY_SHORT_NUDGE_MS = 1 * 60 * 1000;
     const isPreview = new URLSearchParams(location.search).get("preview") === "1";
 
     const BOOT = [
@@ -404,6 +405,7 @@
     const THEME_KEY = "spacecomms-theme";
     const latencyByPost = new Map();
     let currentLatencyMs = 14 * 60 * 1000 + 22 * 1000;
+    let lastLatencyOrigin = "";
 
     function systemTheme() {
       return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
@@ -624,6 +626,9 @@
     function persistLatency() {
       try {
         localStorage.setItem(LATENCY_KEY, String(currentLatencyMs));
+        if (lastLatencyOrigin) {
+          localStorage.setItem(LATENCY_ORIGIN_KEY, lastLatencyOrigin);
+        }
       } catch {
         // ignore
       }
@@ -635,19 +640,27 @@
         if (Number.isFinite(saved)) {
           currentLatencyMs = clampLatency(saved);
         } else {
-          currentLatencyMs = clampLatency(rand(11 * 60 * 1000, 17 * 60 * 1000));
+          currentLatencyMs = clampLatency(rand(LATENCY_MIN_MS, LATENCY_MAX_MS));
         }
+        lastLatencyOrigin = String(localStorage.getItem(LATENCY_ORIGIN_KEY) || "").trim();
       } catch {
         currentLatencyMs = clampLatency(14 * 60 * 1000 + 22 * 1000);
+        lastLatencyOrigin = "";
       }
       BOOT[2] = { type: "sys", text: uplinkLatencyLine(currentLatencyMs) };
     }
 
-    function maybeNudgeLatency() {
-      // De tempos em tempos: ajusta no máximo ±2 minutos.
-      if (Math.random() > 0.42) return;
-      const delta = Math.round((Math.random() * 2 - 1) * LATENCY_NUDGE_MAX_MS);
+    function maybeShortNudgeLatency() {
+      // Variações curtas (±1 min) com mais frequência.
+      if (Math.random() > 0.75) return;
+      const delta = Math.round((Math.random() * 2 - 1) * LATENCY_SHORT_NUDGE_MS);
       currentLatencyMs = clampLatency(currentLatencyMs + delta);
+      persistLatency();
+    }
+
+    function rollLargeLatencyForOrigin() {
+      // Salto grande: novo valor aleatório dentro de 14–25 min.
+      currentLatencyMs = clampLatency(rand(LATENCY_MIN_MS, LATENCY_MAX_MS));
       persistLatency();
     }
 
@@ -669,7 +682,13 @@
     function prepareLatencyForPost(post) {
       const id = String(post.id);
       if (!latencyByPost.has(id)) {
-        maybeNudgeLatency();
+        const origin = String(post.origin || "").trim();
+        if (origin && lastLatencyOrigin && origin !== lastLatencyOrigin) {
+          rollLargeLatencyForOrigin();
+        } else {
+          maybeShortNudgeLatency();
+        }
+        if (origin) lastLatencyOrigin = origin;
         latencyByPost.set(id, currentLatencyMs);
         persistLatency();
       }
