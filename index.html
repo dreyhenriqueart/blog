@@ -599,22 +599,16 @@
       const origin = escapeHtml(post.origin);
       const callsign = escapeHtml(post.callsign);
       return (
-        `<span class="meta-dim">[${stamp}] &lt;&lt; </span>` +
-        `<span class="meta-hi">INCOMING</span>` +
-        `<span class="meta-dim"> // </span>` +
-        `<span class="meta-hi">ORIGIN: ${origin}</span>` +
-        `<span class="meta-dim"> / </span>` +
-        `<span class="meta-hi">CALLSIGN: ${callsign}</span>`
+        `<span class="meta-dim">[${stamp}] &lt;&lt; INCOMING // ORIGIN: </span>` +
+        `<span class="meta-hi">${origin}</span>` +
+        `<span class="meta-dim"> / CALLSIGN: </span>` +
+        `<span class="meta-hi">${callsign}</span>`
       );
     }
 
     function buildTransmissionEndHtml(endedAt) {
       const stamp = escapeHtml(formatIncomingStamp(endedAt));
-      return (
-        `<span class="meta-dim">[${stamp}] &lt;&lt; </span>` +
-        `<span class="meta-hi">TRANSMISSION END</span>` +
-        `<span class="meta-dim"> //</span>`
-      );
+      return `<span class="meta-dim">[${stamp}] &lt;&lt; TRANSMISSION END //</span>`;
     }
 
     function buildIncomingHeader(post) {
