@@ -256,6 +256,112 @@
     return res.json();
   }
 
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+  function imageExtension(name, mime) {
+    const fromName = String(name || "").match(/\.([a-z0-9]+)$/i);
+    if (fromName) {
+      const ext = fromName[1].toLowerCase();
+      if (ext === "jpeg") return "jpg";
+      if (["jpg", "png", "webp", "gif"].includes(ext)) return ext;
+    }
+    const fromMime = {
+      "image/jpeg": "jpg",
+      "image/jpg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif"
+    };
+    return fromMime[String(mime || "").toLowerCase()] || "jpg";
+  }
+
+  function normalizeImageField(image) {
+    if (!image || !image.src) return undefined;
+    return {
+      src: String(image.src),
+      name: String(image.name || "attachment").slice(0, 180)
+    };
+  }
+
+  async function getPathSha(token, path) {
+    const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}?ref=${GH_BRANCH}&_=${Date.now()}`;
+    const res = await ghFetch(url, {
+      cache: "no-store",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`
+      }
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `GitHub GET ${res.status}`);
+    }
+    const meta = await res.json();
+    return meta.sha || null;
+  }
+
+  async function putRepoFile(token, path, base64Content, message) {
+    const sha = await getPathSha(token, path);
+    const body = {
+      message,
+      content: base64Content,
+      branch: GH_BRANCH
+    };
+    if (sha) body.sha = sha;
+
+    const res = await ghFetch(
+      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`,
+      {
+        method: "PUT",
+        cache: "no-store",
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `GitHub PUT media ${res.status}`);
+    }
+    return res.json();
+  }
+
+  async function uploadImageAsset(payload) {
+    if (!payload || !payload.imageBase64) return undefined;
+
+    const base64 = String(payload.imageBase64).replace(/\s/g, "");
+    if (!base64) return undefined;
+
+    const approxBytes = Math.floor((base64.length * 3) / 4);
+    if (approxBytes > MAX_IMAGE_BYTES) {
+      throw new Error("imagem acima de 8MB");
+    }
+
+    const name = String(payload.imageName || "attachment.jpg");
+    const mime = String(payload.imageMime || "image/jpeg");
+    const ext = imageExtension(name, mime);
+    const safeName = name.replace(/[^\w.\-()+ ]+/g, "_").slice(0, 120) || `attachment.${ext}`;
+
+    if (isLocalHost()) {
+      return {
+        imageBase64: base64,
+        imageName: safeName,
+        imageMime: mime,
+        _local: true
+      };
+    }
+
+    const token = await ensureToken();
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const path = `media/${stamp}.${ext}`;
+    await putRepoFile(token, path, base64, `attach media ${stamp}`);
+    return normalizeImageField({ src: path, name: safeName });
+  }
+
   async function mutateRemote(mutator, message) {
     const token = await ensureToken();
     let lastError = null;
@@ -367,6 +473,14 @@
       return created;
     }
 
+    let image = undefined;
+
+    if (payload.imageBase64) {
+      image = await uploadImageAsset(payload);
+    } else if (payload.image && payload.image.src) {
+      image = normalizeImageField(payload.image);
+    }
+
     return mutateRemote((posts) => {
       const created = {
         id: nextId(posts),
@@ -377,6 +491,7 @@
         archived: false,
         lost: false
       };
+      if (image) created.image = image;
       posts.push(created);
       return created;
     }, `publish transmission ${Date.now()}`);

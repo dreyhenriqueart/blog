@@ -69,12 +69,34 @@
       outline: none;
     }
 
+    input[type="file"] {
+      border-bottom: 1px solid var(--fg);
+      padding: 0.35rem 0;
+      color: var(--fg);
+    }
+
     input:focus, textarea:focus { border-bottom-color: var(--fg); }
 
     textarea {
       min-height: 160px;
       resize: vertical;
       white-space: pre-wrap;
+    }
+
+    .image-preview-wrap {
+      margin-top: -0.5rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .image-preview-wrap img {
+      max-width: 160px;
+      max-height: 96px;
+      object-fit: contain;
+      border: 1px solid var(--fg);
     }
 
     .form-block { margin-top: 1.5rem; }
@@ -146,6 +168,13 @@
       <label for="message">TRANSMISSION BODY</label>
       <textarea id="message" name="message" placeholder="Uma linha por paragrafo." required></textarea>
 
+      <label for="image">ATTACHMENT (imagem opcional)</label>
+      <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
+      <div id="image-preview-wrap" class="image-preview-wrap" hidden>
+        <img id="image-preview" alt="Previa do anexo" />
+        <button type="button" id="image-clear">COMMS&gt; clear attach_</button>
+      </div>
+
       <div class="actions">
         <button type="button" id="version-btn">COMMS&gt; set version_</button>
         <button type="submit" id="preview-btn">COMMS&gt; preview_</button>
@@ -175,6 +204,12 @@
     const publishBtn = document.getElementById("publish-btn");
     const versionBtn = document.getElementById("version-btn");
     const versionInput = document.getElementById("terminal-version");
+    const imageInput = document.getElementById("image");
+    const imagePreviewWrap = document.getElementById("image-preview-wrap");
+    const imagePreview = document.getElementById("image-preview");
+    const imageClear = document.getElementById("image-clear");
+    const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+    let pendingImage = null;
 
     function doYear(date) { return date.getFullYear() - DO_EPOCH; }
 
@@ -226,6 +261,28 @@
       publishBtn.disabled = isBusy;
       versionBtn.disabled = isBusy;
       versionInput.disabled = isBusy;
+      imageInput.disabled = isBusy;
+      imageClear.disabled = isBusy;
+    }
+
+    function clearPendingImage() {
+      pendingImage = null;
+      imageInput.value = "";
+      imagePreview.removeAttribute("src");
+      imagePreviewWrap.hidden = true;
+    }
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result || "");
+          const comma = result.indexOf(",");
+          resolve(comma >= 0 ? result.slice(comma + 1) : result);
+        };
+        reader.onerror = () => reject(new Error("falha ao ler imagem"));
+        reader.readAsDataURL(file);
+      });
     }
 
     async function loadTerminalVersion() {
@@ -252,10 +309,57 @@
         return null;
       }
 
-      return { sentAt: new Date().toISOString(), origin, callsign, lines };
+      const payload = { sentAt: new Date().toISOString(), origin, callsign, lines };
+      if (pendingImage) {
+        payload.imageBase64 = pendingImage.base64;
+        payload.imageName = pendingImage.name;
+        payload.imageMime = pendingImage.mime;
+        payload.image = {
+          src: `data:${pendingImage.mime};base64,${pendingImage.base64}`,
+          name: pendingImage.name
+        };
+      }
+      return payload;
     }
 
     function bindCompose() {
+      imageInput.addEventListener("change", async () => {
+        clearStatus();
+        const file = imageInput.files && imageInput.files[0];
+        if (!file) {
+          clearPendingImage();
+          return;
+        }
+        if (!String(file.type || "").startsWith("image/")) {
+          clearPendingImage();
+          showError("[ERR] selecione um arquivo de imagem.");
+          return;
+        }
+        if (file.size > MAX_IMAGE_BYTES) {
+          clearPendingImage();
+          showError("[ERR] imagem acima de 8MB.");
+          return;
+        }
+        try {
+          const base64 = await fileToBase64(file);
+          pendingImage = {
+            base64,
+            name: file.name || "attachment.jpg",
+            mime: file.type || "image/jpeg"
+          };
+          imagePreview.src = URL.createObjectURL(file);
+          imagePreviewWrap.hidden = false;
+        } catch (err) {
+          clearPendingImage();
+          showError(`[ERR] ${err.message}`);
+        }
+      });
+
+      imageClear.addEventListener("click", () => {
+        clearPendingImage();
+        clearStatus();
+      });
+
       versionBtn.addEventListener("click", async () => {
         clearStatus();
         const version = versionInput.value.trim();
@@ -283,7 +387,14 @@
         const payload = readComposePayload();
         if (!payload) return;
 
-        const draft = { ...payload, id: `preview-${Date.now()}` };
+        const draft = {
+          ...payload,
+          id: `preview-${Date.now()}`,
+          image: payload.image || undefined
+        };
+        delete draft.imageBase64;
+        delete draft.imageName;
+        delete draft.imageMime;
 
         setBusy(true);
         try {
@@ -309,11 +420,15 @@
         const payload = readComposePayload();
         if (!payload) return;
 
+        const publishPayload = { ...payload };
+        delete publishPayload.image;
+
         setBusy(true);
         try {
-          const created = await SpaceCommsStore.publishPost(payload);
+          const created = await SpaceCommsStore.publishPost(publishPayload);
           showSuccess(`[SYS] published // id ${created.id} // uplink stored`);
           document.getElementById("message").value = "";
+          clearPendingImage();
         } catch (err) {
           showError(`[ERR] ${err.message}`);
         } finally {

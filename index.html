@@ -188,6 +188,98 @@
       color: var(--fg-dim);
     }
 
+    .line--attach {
+      margin-top: 0.35em;
+      margin-bottom: 0;
+      max-width: var(--msg-wrap, 42ch);
+    }
+
+    .attach-thumb {
+      display: inline-block;
+      padding: 0;
+      margin: 0;
+      border: 1px solid var(--fg-dim);
+      background: transparent;
+      cursor: pointer;
+      line-height: 0;
+      vertical-align: top;
+    }
+
+    .attach-thumb img {
+      display: block;
+      max-width: 112px;
+      max-height: 72px;
+      width: auto;
+      height: auto;
+      object-fit: cover;
+      opacity: 0.85;
+    }
+
+    .attach-thumb:hover img,
+    .attach-thumb:focus-visible img {
+      opacity: 1;
+    }
+
+    .attach-thumb:focus-visible {
+      outline: 1px solid var(--fg);
+      outline-offset: 2px;
+    }
+
+    .image-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      background: rgba(12, 12, 20, 0.92);
+      padding: 12px;
+    }
+
+    html[data-theme="light"] .image-overlay {
+      background: rgba(204, 204, 204, 0.94);
+    }
+
+    .image-overlay[hidden] {
+      display: none !important;
+    }
+
+    .image-overlay__bar {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .image-overlay__bar button {
+      background: none;
+      border: none;
+      font: inherit;
+      color: var(--fg-dim);
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .image-overlay__bar button:hover,
+    .image-overlay__bar button:focus-visible {
+      color: var(--fg);
+    }
+
+    .image-overlay__stage {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .image-overlay__stage img {
+      max-width: min(100%, 96vw);
+      max-height: calc(100vh - 64px);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+
     /* Único texto “brilhante” contínuo: corpo da mensagem */
     .line--body {
       color: var(--fg);
@@ -274,6 +366,16 @@
     </aside>
   </div>
 
+  <div id="image-overlay" class="image-overlay" hidden>
+    <div class="image-overlay__bar">
+      <button type="button" id="overlay-close" aria-label="Fechar">X</button>
+      <button type="button" id="overlay-download">download_</button>
+    </div>
+    <div class="image-overlay__stage">
+      <img id="overlay-img" alt="" />
+    </div>
+  </div>
+
   <script src="posts-store.js"></script>
   <script>
     const PREVIEW_KEY = "spacecomms-preview";
@@ -339,13 +441,17 @@
     const queue = [];
 
     function parsePost(raw) {
+      const image = raw.image && raw.image.src
+        ? { src: String(raw.image.src), name: String(raw.image.name || "attachment") }
+        : null;
       return {
         id: raw.id,
         sentAt: new Date(raw.sentAt),
         origin: raw.origin,
         callsign: raw.callsign,
         lines: Array.isArray(raw.lines) ? raw.lines : [String(raw.lines || "")],
-        lost: Boolean(raw.lost)
+        lost: Boolean(raw.lost),
+        image
       };
     }
 
@@ -599,16 +705,103 @@
       const origin = escapeHtml(post.origin);
       const callsign = escapeHtml(post.callsign);
       return (
-        `<span class="meta-dim">[${stamp}] &lt;&lt; INCOMING // ORIGIN: </span>` +
-        `<span class="meta-hi">${origin}</span>` +
-        `<span class="meta-dim"> / CALLSIGN: </span>` +
-        `<span class="meta-hi">${callsign}</span>`
+        `<span class="meta-dim">[${stamp}] &lt;&lt; INCOMING // ORIGIN: ${origin} / CALLSIGN: ${callsign}</span>`
       );
     }
 
     function buildTransmissionEndHtml(endedAt) {
       const stamp = escapeHtml(formatIncomingStamp(endedAt));
       return `<span class="meta-dim">[${stamp}] &lt;&lt; TRANSMISSION END //</span>`;
+    }
+
+    function resolveMediaUrl(src) {
+      const value = String(src || "");
+      if (/^(data:|https?:|blob:)/i.test(value)) return value;
+      return value;
+    }
+
+    let overlayImage = null;
+    const overlayEl = document.getElementById("image-overlay");
+    const overlayImg = document.getElementById("overlay-img");
+    const overlayClose = document.getElementById("overlay-close");
+    const overlayDownload = document.getElementById("overlay-download");
+
+    function closeImageOverlay() {
+      if (!overlayEl) return;
+      overlayEl.hidden = true;
+      if (overlayImg) overlayImg.removeAttribute("src");
+      overlayImage = null;
+    }
+
+    function openImageOverlay(image) {
+      if (!image || !image.src || !overlayEl || !overlayImg) return;
+      overlayImage = image;
+      overlayImg.src = resolveMediaUrl(image.src);
+      overlayImg.alt = image.name || "attachment";
+      overlayEl.hidden = false;
+      if (overlayClose) overlayClose.focus();
+    }
+
+    async function downloadOverlayImage() {
+      if (!overlayImage || !overlayImage.src) return;
+      const url = resolveMediaUrl(overlayImage.src);
+      const name = overlayImage.name || "transmission-attachment.jpg";
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+      } catch {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        a.target = "_blank";
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+    }
+
+    if (overlayClose) overlayClose.addEventListener("click", closeImageOverlay);
+    if (overlayDownload) overlayDownload.addEventListener("click", () => { downloadOverlayImage(); });
+    if (overlayEl) {
+      overlayEl.addEventListener("click", (event) => {
+        if (event.target === overlayEl) closeImageOverlay();
+      });
+    }
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && overlayEl && !overlayEl.hidden) closeImageOverlay();
+    });
+
+    async function appendAttachment(post) {
+      if (!post.image || !post.image.src || post.lost) return null;
+
+      const wrap = document.createElement("div");
+      wrap.className = "line line--attach";
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "attach-thumb";
+      btn.setAttribute("aria-label", "Abrir anexo em tamanho normal");
+
+      const img = document.createElement("img");
+      img.src = resolveMediaUrl(post.image.src);
+      img.alt = post.image.name || "attachment";
+      img.loading = "lazy";
+
+      btn.appendChild(img);
+      btn.addEventListener("click", () => openImageOverlay(post.image));
+      wrap.appendChild(btn);
+      feed.appendChild(wrap);
+      await delay(rand(100, 180));
+      return wrap;
     }
 
     function buildIncomingHeader(post) {
@@ -654,6 +847,8 @@
         lastBodyLine = await revealLine("body", String(line), rand(160, 280));
       }
 
+      await appendAttachment(post);
+
       await revealLine("blank", "", rand(80, 140));
       await revealLine("blank", "", rand(80, 140));
       await revealLine("meta", buildTransmissionEndHtml(new Date()), rand(160, 280), { html: true });
@@ -685,6 +880,8 @@
         lastBodyLine = await typeLine("body", String(line));
         await delay(rand(120, 280));
       }
+
+      await appendAttachment(post);
 
       await revealLine("blank", "", rand(80, 140));
       await revealLine("blank", "", rand(80, 140));
@@ -780,13 +977,17 @@
       const lines = Array.isArray(post.lines)
         ? post.lines
         : [String(post.body || post.text || "")];
+      const image = post.image && post.image.src
+        ? { src: String(post.image.src), name: String(post.image.name || "attachment") }
+        : null;
 
       return {
         id: post.id || String(Date.now()),
         sentAt: post.sentAt ? new Date(post.sentAt) : new Date(),
         origin: post.origin || "UNKNOWN",
         callsign: post.callsign || "UNKNOWN",
-        lines
+        lines,
+        image
       };
     }
 

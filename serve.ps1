@@ -56,6 +56,37 @@ function Add-Post($payload) {
     lost     = $false
   }
 
+  $imageBase64 = [string]$payload.imageBase64
+  $imageName = [string]$payload.imageName
+  if (-not [string]::IsNullOrWhiteSpace($imageBase64) -and -not [string]::IsNullOrWhiteSpace($imageName)) {
+    $mediaDir = Join-Path $Root "media"
+    if (-not (Test-Path $mediaDir -PathType Container)) {
+      New-Item -ItemType Directory -Path $mediaDir | Out-Null
+    }
+
+    $ext = [System.IO.Path]::GetExtension($imageName).ToLowerInvariant()
+    if ([string]::IsNullOrWhiteSpace($ext)) { $ext = ".jpg" }
+    if ($ext -eq ".jpeg") { $ext = ".jpg" }
+    $allowed = @(".jpg", ".png", ".webp", ".gif")
+    if ($allowed -notcontains $ext) { $ext = ".jpg" }
+
+    $fileName = "{0}-{1}{2}" -f $newPost.id, ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()), $ext
+    $bytes = [Convert]::FromBase64String(($imageBase64 -replace "\s", ""))
+    if ($bytes.Length -gt (8 * 1024 * 1024)) {
+      throw "imagem acima de 8MB"
+    }
+    [System.IO.File]::WriteAllBytes((Join-Path $mediaDir $fileName), $bytes)
+
+    $cleanName = ($imageName -replace '[^\w.\-()+ ]', '_')
+    if ($cleanName.Length -gt 120) { $cleanName = $cleanName.Substring(0, 120) }
+    if ([string]::IsNullOrWhiteSpace($cleanName)) { $cleanName = "attachment$ext" }
+
+    $newPost | Add-Member -NotePropertyName image -NotePropertyValue ([PSCustomObject]@{
+      src  = "media/$fileName"
+      name = $cleanName
+    }) -Force
+  }
+
   $data.posts = @($data.posts) + @($newPost)
 
   $json = $data | ConvertTo-Json -Depth 10
@@ -338,11 +369,17 @@ while ($listener.IsListening) {
         $bytes = [System.IO.File]::ReadAllBytes($file)
         $ext = [System.IO.Path]::GetExtension($file).ToLowerInvariant()
         $contentType = switch ($ext) {
-          ".html" { "text/html; charset=utf-8" }
-          ".css"  { "text/css; charset=utf-8" }
-          ".js"   { "application/javascript; charset=utf-8" }
-          ".json" { "application/json; charset=utf-8" }
-          default { "application/octet-stream" }
+          ".html"  { "text/html; charset=utf-8" }
+          ".css"   { "text/css; charset=utf-8" }
+          ".js"    { "application/javascript; charset=utf-8" }
+          ".json"  { "application/json; charset=utf-8" }
+          ".woff2" { "font/woff2" }
+          ".png"   { "image/png" }
+          ".jpg"   { "image/jpeg" }
+          ".jpeg"  { "image/jpeg" }
+          ".webp"  { "image/webp" }
+          ".gif"   { "image/gif" }
+          default  { "application/octet-stream" }
         }
         if ($ext -eq ".json") {
           $response.Headers.Add("Cache-Control", "no-store, no-cache, must-revalidate")
