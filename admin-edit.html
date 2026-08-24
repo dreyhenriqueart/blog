@@ -25,7 +25,7 @@
     html, body {
       min-height: 100%;
       background: var(--bg);
-      color: var(--fg);
+      color: var(--fg-dim);
       font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
       font-size: 12pt;
       line-height: 1;
@@ -37,25 +37,26 @@
     .screen { max-width: 720px; padding: 8px; }
 
     .status-bar {
-      color: var(--fg);
+      color: var(--fg-dim);
       margin-bottom: 1.5rem;
       user-select: none;
     }
-    .status-bar span { color: var(--fg); }
-    .sys-line { color: var(--fg); margin-bottom: 0.5rem; }
+    .status-bar span { color: var(--fg-dim); }
+    .sys-line { color: var(--fg-dim); margin-bottom: 0.5rem; }
 
     .nav-link {
       display: inline-block;
       margin-top: 1.5rem;
       margin-right: 1.25rem;
-      color: var(--fg);
+      color: var(--fg-dim);
       text-decoration: none;
       font: inherit;
     }
-    .nav-link:hover { color: var(--fg-soft); }
+    .nav-link:hover,
+    .nav-link:focus-visible { color: var(--fg); }
 
     .manage-title {
-      color: var(--fg);
+      color: var(--fg-dim);
       margin: 1.5rem 0 0.75rem;
     }
 
@@ -73,14 +74,14 @@
     .post-row input[type="checkbox"] {
       width: auto;
       margin: 0.2rem 0 0;
-      accent-color: var(--fg);
+      accent-color: var(--fg-dim);
     }
 
     .post-row__name {
       background: none;
       border: none;
       font: inherit;
-      color: var(--fg);
+      color: var(--fg-dim);
       cursor: pointer;
       padding: 0;
       text-align: left;
@@ -88,8 +89,9 @@
       overflow: hidden;
     }
     .post-row__name:hover,
-    .post-row__name.is-open { color: var(--fg-soft); }
-    .post-row__name.is-lost { color: var(--fg-dim); }
+    .post-row__name:focus-visible,
+    .post-row__name.is-open { color: var(--fg); }
+    .post-row__name.is-lost { color: var(--fg-dim); opacity: 0.75; }
 
     .post-preview {
       display: none;
@@ -100,7 +102,7 @@
     .post-preview.is-open { display: block; }
 
     .manage-empty {
-      color: var(--fg);
+      color: var(--fg-dim);
       margin-bottom: 1rem;
     }
 
@@ -115,20 +117,36 @@
       background: none;
       border: none;
       font: inherit;
-      color: var(--fg);
+      color: var(--fg-dim);
       cursor: pointer;
       padding: 0;
       text-align: left;
     }
-    button:hover { color: var(--fg-soft); }
-    button:disabled { color: var(--fg-soft); cursor: wait; }
+    button:hover,
+    button:focus-visible { color: var(--fg); }
+    button:disabled {
+      color: var(--fg-dim);
+      opacity: 0.7;
+      cursor: wait;
+    }
 
-    .status-msg { margin-top: 0.75rem; display: none; }
+    .status-msg { margin-top: 0.75rem; display: none; color: var(--fg-dim); }
     .status-msg.is-visible { display: block; }
-    .error { color: var(--fg); }
-    .success { color: var(--fg); }
+    .error { color: var(--fg-dim); }
+    .success { color: var(--fg-dim); }
 
-    .auth-gate { max-width: 720px; padding: 8px; }
+    .auth-gate { max-width: 720px; padding: 8px; color: var(--fg-dim); }
+    .auth-gate .status-bar,
+    .auth-gate .status-bar span,
+    .auth-gate .sys-line,
+    .auth-gate label { color: var(--fg-dim); }
+    .auth-gate input {
+      color: var(--fg);
+      border-bottom-color: var(--fg-dim);
+    }
+    .auth-gate button { color: var(--fg-dim); }
+    .auth-gate button:hover,
+    .auth-gate button:focus-visible { color: var(--fg); }
   </style>
 </head>
 <body>

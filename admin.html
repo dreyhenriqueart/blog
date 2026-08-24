@@ -17,6 +17,7 @@
       --bg: #0c0c14;
       --fg: #cccccc;
       --fg-soft: #e8e8e8;
+      --fg-dim: #808080;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,7 +25,7 @@
     html, body {
       min-height: 100%;
       background: var(--bg);
-      color: var(--fg);
+      color: var(--fg-dim);
       font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
       font-size: 12pt;
       line-height: 1;
@@ -37,18 +38,18 @@
     .screen { max-width: 640px; padding: 8px; }
 
     .status-bar {
-      color: var(--fg);
+      color: var(--fg-dim);
       margin-bottom: 1.5rem;
       user-select: none;
     }
 
-    .status-bar span { color: var(--fg); }
+    .status-bar span { color: var(--fg-dim); }
 
-    .sys-line { color: var(--fg); margin-bottom: 0.5rem; }
+    .sys-line { color: var(--fg-dim); margin-bottom: 0.5rem; }
 
     label {
       display: block;
-      color: var(--fg);
+      color: var(--fg-dim);
       margin-bottom: 0.35rem;
     }
 
@@ -57,7 +58,7 @@
       align-items: stretch;
       gap: 0.5rem;
       margin-bottom: 1.25rem;
-      border-bottom: 1px solid var(--fg);
+      border-bottom: 1px solid var(--fg-dim);
     }
 
     .field-row input {
@@ -79,6 +80,12 @@
       flex: 0 0 auto;
       align-self: center;
       padding: 0 0.15rem;
+      color: var(--fg-dim);
+    }
+
+    .field-row .field-action:hover,
+    .field-row .field-action:focus-visible {
+      color: var(--fg);
     }
 
     input:not([type="file"]), textarea {
@@ -87,7 +94,7 @@
       background: var(--bg);
       color: var(--fg);
       border: none;
-      border-bottom: 1px solid var(--fg);
+      border-bottom: 1px solid var(--fg-dim);
       font: inherit;
       line-height: 1;
       padding: 0.25rem 0;
@@ -95,7 +102,13 @@
       outline: none;
     }
 
-    input:focus, textarea:focus { border-bottom-color: var(--fg); }
+    input:focus, textarea:focus { border-bottom-color: var(--fg-dim); }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: var(--fg-dim);
+      opacity: 1;
+    }
 
     textarea {
       min-height: 160px;
@@ -106,7 +119,7 @@
     .attach-box {
       position: relative;
       margin-bottom: 1.25rem;
-      border-bottom: 1px solid var(--fg);
+      border-bottom: 1px solid var(--fg-dim);
       padding: 0.35rem 1.75rem 0.5rem 0;
       min-height: 2rem;
     }
@@ -115,7 +128,7 @@
       display: block;
       width: 100%;
       background: var(--bg);
-      color: var(--fg);
+      color: var(--fg-dim);
       border: none;
       font: inherit;
       padding: 0;
@@ -128,6 +141,12 @@
       right: 0;
       line-height: 1;
       padding: 0.15rem 0.25rem;
+      color: var(--fg-dim);
+    }
+
+    .attach-box .attach-x:hover,
+    .attach-box .attach-x:focus-visible {
+      color: var(--fg);
     }
 
     .attach-box .attach-x[hidden] { display: none; }
@@ -138,7 +157,7 @@
       max-height: 96px;
       object-fit: contain;
       margin-top: 0.5rem;
-      border: 1px solid var(--fg);
+      border: 1px solid var(--fg-dim);
     }
 
     .attach-box img[hidden] { display: none; }
@@ -156,34 +175,77 @@
       display: inline-block;
       margin-top: 1.5rem;
       margin-right: 1.25rem;
-      color: var(--fg);
+      color: var(--fg-dim);
       text-decoration: none;
       font: inherit;
     }
 
-    .nav-link:hover { color: var(--fg-soft); }
+    .nav-link:hover,
+    .nav-link:focus-visible { color: var(--fg); }
 
     button {
       background: none;
       border: none;
       font: inherit;
-      color: var(--fg);
+      color: var(--fg-dim);
       cursor: pointer;
       padding: 0;
       text-align: left;
     }
 
-    button:hover { color: var(--fg-soft); }
-    button:disabled { color: var(--fg-soft); cursor: wait; }
+    button:hover,
+    button:focus-visible { color: var(--fg); }
 
-    .status-msg { margin-top: 0.75rem; display: none; }
+    button:disabled {
+      color: var(--fg-dim);
+      opacity: 0.7;
+      cursor: wait;
+    }
+
+    #publish-btn {
+      color: var(--fg);
+    }
+
+    #publish-btn:hover,
+    #publish-btn:focus-visible {
+      color: var(--fg-soft);
+    }
+
+    #publish-btn:disabled {
+      color: var(--fg);
+      opacity: 0.7;
+    }
+
+    .status-msg { margin-top: 0.75rem; display: none; color: var(--fg-dim); }
     .status-msg.is-visible { display: block; }
-    .error { color: var(--fg); }
-    .success { color: var(--fg); }
+    .error { color: var(--fg-dim); }
+    .success { color: var(--fg-dim); }
 
     .auth-gate {
       max-width: 640px;
       padding: 8px;
+      color: var(--fg-dim);
+    }
+
+    .auth-gate .status-bar,
+    .auth-gate .status-bar span,
+    .auth-gate .sys-line,
+    .auth-gate label {
+      color: var(--fg-dim);
+    }
+
+    .auth-gate input {
+      color: var(--fg);
+      border-bottom-color: var(--fg-dim);
+    }
+
+    .auth-gate button {
+      color: var(--fg-dim);
+    }
+
+    .auth-gate button:hover,
+    .auth-gate button:focus-visible {
+      color: var(--fg);
     }
   </style>
 </head>
