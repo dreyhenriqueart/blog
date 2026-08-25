@@ -26,6 +26,17 @@
       ],
       "archived": false,
       "lost": false
+    },
+    {
+      "id": "006",
+      "sentAt": "2026-08-25T02:46:43.540Z",
+      "origin": "PSAR-3",
+      "callsign": "VEGA-1",
+      "lines": [
+        "Lembro de ver isso durante os testes. No fim eu já sabia dessa possibilidade"
+      ],
+      "archived": false,
+      "lost": false
     }
   ]
 }
